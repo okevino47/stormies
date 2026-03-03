@@ -1,0 +1,19 @@
+<idea-plugin>
+    <id>com.pixelagents.jetbrains</id>
+    <name>Stormies - Pixel Agents</name>
+    <vendor>Stormies</vendor>
+
+    <description><![CDATA[
+        Pixel art office where your Claude Code agents come to life as animated characters.
+        Watch your AI coding assistants work in a charming virtual office environment.
+    ]]></description>
+
+    <depends>com.intellij.modules.platform</depends>
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow id="Stormies - Pixel Agents"
+                    anchor="bottom"
+                    factoryClass="com.pixelagents.PixelAgentsToolWindowFactory"
+                    icon="AllIcons.General.User"/>
+    </extensions>
+</idea-plugin>

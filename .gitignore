@@ -1,0 +1,18 @@
+# Gradle
+.gradle/
+build/
+
+# IntelliJ
+.idea/
+*.iml
+
+# Node
+webview-ui/node_modules/
+webview-ui/dist/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Built webview (regenerated from webview-ui/dist)
+src/main/resources/webview/
