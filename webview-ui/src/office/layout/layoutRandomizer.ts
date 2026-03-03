@@ -1,7 +1,7 @@
 import { TileType, FurnitureType } from '../types.js'
 import type { TileType as TileTypeVal, OfficeLayout, PlacedFurniture, FloorColor } from '../types.js'
 
-// ── Room types & furniture recipes ───────────────────────────
+// ── Room types & sizing ─────────────────────────────────────
 
 type RoomType = 'workspace' | 'meeting' | 'kitchen' | 'library' | 'storage' | 'lounge' | 'manager'
 
@@ -9,80 +9,16 @@ interface RoomTypeDef {
   weight: number
   minW: number
   minH: number
-  furniture: Array<{ type: string; count: number | [number, number]; wallOnly?: boolean; cornerOnly?: boolean }>
 }
 
 const ROOM_TYPES: Record<RoomType, RoomTypeDef> = {
-  workspace: {
-    weight: 30,
-    minW: 5, minH: 5,
-    furniture: [
-      { type: FurnitureType.DESK, count: [1, 3] },
-      { type: FurnitureType.CHAIR, count: [2, 6] },
-      { type: FurnitureType.PC, count: [1, 2] },
-      { type: FurnitureType.LAMP, count: [0, 1] },
-    ],
-  },
-  meeting: {
-    weight: 15,
-    minW: 5, minH: 5,
-    furniture: [
-      { type: FurnitureType.DESK, count: 1 },
-      { type: FurnitureType.CHAIR, count: [3, 6] },
-      { type: FurnitureType.WHITEBOARD, count: [0, 1] },
-    ],
-  },
-  kitchen: {
-    weight: 10,
-    minW: 4, minH: 4,
-    furniture: [
-      { type: FurnitureType.COFFEE_MACHINE, count: 1 },
-      { type: FurnitureType.COFFEE_TABLE, count: [1, 2] },
-      { type: FurnitureType.COUCH, count: [0, 1] },
-      { type: FurnitureType.COOLER, count: 1 },
-    ],
-  },
-  library: {
-    weight: 10,
-    minW: 4, minH: 4,
-    furniture: [
-      { type: FurnitureType.BOOKSHELF, count: [2, 4] },
-      { type: FurnitureType.CHAIR, count: [1, 2] },
-      { type: FurnitureType.LAMP, count: [0, 1] },
-      { type: FurnitureType.PLANT, count: [0, 1] },
-    ],
-  },
-  storage: {
-    weight: 10,
-    minW: 3, minH: 3,
-    furniture: [
-      { type: FurnitureType.FILING_CABINET, count: [2, 4] },
-      { type: FurnitureType.PRINTER, count: [0, 1] },
-      { type: FurnitureType.BOOKSHELF, count: [0, 2] },
-    ],
-  },
-  lounge: {
-    weight: 15,
-    minW: 5, minH: 5,
-    furniture: [
-      { type: FurnitureType.COUCH, count: [1, 2] },
-      { type: FurnitureType.RUG, count: [0, 1] },
-      { type: FurnitureType.COFFEE_TABLE, count: [1, 2] },
-      { type: FurnitureType.POTTED_TREE, count: [0, 1] },
-      { type: FurnitureType.PLANT, count: [0, 2] },
-    ],
-  },
-  manager: {
-    weight: 10,
-    minW: 4, minH: 4,
-    furniture: [
-      { type: FurnitureType.DESK, count: 1 },
-      { type: FurnitureType.CHAIR, count: [1, 2] },
-      { type: FurnitureType.BOOKSHELF, count: [0, 1] },
-      { type: FurnitureType.PLANT, count: [0, 1] },
-      { type: FurnitureType.LAMP, count: [0, 1] },
-    ],
-  },
+  workspace: { weight: 30, minW: 5, minH: 5 },
+  meeting:   { weight: 15, minW: 5, minH: 5 },
+  kitchen:   { weight: 10, minW: 4, minH: 4 },
+  library:   { weight: 10, minW: 4, minH: 4 },
+  storage:   { weight: 10, minW: 3, minH: 3 },
+  lounge:    { weight: 15, minW: 5, minH: 5 },
+  manager:   { weight: 10, minW: 4, minH: 4 },
 }
 
 // ── Furniture footprint lookup ───────────────────────────────
@@ -136,6 +72,15 @@ function randInt(min: number, max: number): number {
 
 function randChoice<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)]
+}
+
+function shuffle<T>(arr: T[]): T[] {
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
 }
 
 /**
@@ -222,45 +167,373 @@ function canPlace(
   return true
 }
 
-/**
- * Try to place furniture in the room. Returns the placed items.
- */
-function placeFurnitureInRoom(
-  rect: Rect,
-  roomType: RoomType,
-): PlacedFurniture[] {
-  const def = ROOM_TYPES[roomType]
+// ── Placement helpers ────────────────────────────────────────
+
+type Pos = { col: number; row: number }
+type Wall = 'top' | 'bottom' | 'left' | 'right'
+
+function makeUid(): string {
+  return `r-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function markOccupied(col: number, row: number, fw: number, fh: number, occupied: Set<string>): void {
+  for (let dr = 0; dr < fh; dr++) {
+    for (let dc = 0; dc < fw; dc++) {
+      occupied.add(`${col + dc},${row + dr}`)
+    }
+  }
+}
+
+/** Try to place an item at an exact position. Returns placement position or null. */
+function tryPlaceAt(
+  col: number, row: number, type: string,
+  rect: Rect, occupied: Set<string>, placed: PlacedFurniture[],
+): Pos | null {
+  const fp = FOOTPRINTS[type]
+  if (!fp) return null
+  if (!canPlace(col, row, fp.w, fp.h, rect, occupied)) return null
+  placed.push({ uid: makeUid(), type, col, row })
+  markOccupied(col, row, fp.w, fp.h, occupied)
+  return { col, row }
+}
+
+/** Place an item at a random valid position within the room. */
+function placeRandom(
+  rect: Rect, occupied: Set<string>, type: string,
+  placed: PlacedFurniture[],
+): Pos | null {
+  const fp = FOOTPRINTS[type]
+  if (!fp || rect.w < fp.w || rect.h < fp.h) return null
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const col = randInt(rect.x, rect.x + rect.w - fp.w)
+    const row = randInt(rect.y, rect.y + rect.h - fp.h)
+    const result = tryPlaceAt(col, row, type, rect, occupied, placed)
+    if (result) return result
+  }
+  return null
+}
+
+/** Place an item along a specific wall edge. */
+function placeAlongWall(
+  rect: Rect, occupied: Set<string>, type: string,
+  wall: Wall, placed: PlacedFurniture[],
+): Pos | null {
+  const fp = FOOTPRINTS[type]
+  if (!fp) return null
+  const positions: Pos[] = []
+  switch (wall) {
+    case 'top':
+      for (let c = rect.x; c <= rect.x + rect.w - fp.w; c++)
+        positions.push({ col: c, row: rect.y })
+      break
+    case 'bottom':
+      for (let c = rect.x; c <= rect.x + rect.w - fp.w; c++)
+        positions.push({ col: c, row: rect.y + rect.h - fp.h })
+      break
+    case 'left':
+      for (let r = rect.y; r <= rect.y + rect.h - fp.h; r++)
+        positions.push({ col: rect.x, row: r })
+      break
+    case 'right':
+      for (let r = rect.y; r <= rect.y + rect.h - fp.h; r++)
+        positions.push({ col: rect.x + rect.w - fp.w, row: r })
+      break
+  }
+  for (const pos of shuffle(positions)) {
+    const result = tryPlaceAt(pos.col, pos.row, type, rect, occupied, placed)
+    if (result) return result
+  }
+  return null
+}
+
+/** Place an item along any wall (tries all 4 in random order). */
+function placeAlongAnyWall(
+  rect: Rect, occupied: Set<string>, type: string,
+  placed: PlacedFurniture[],
+): Pos | null {
+  for (const wall of shuffle<Wall>(['top', 'bottom', 'left', 'right'])) {
+    const result = placeAlongWall(rect, occupied, type, wall, placed)
+    if (result) return result
+  }
+  return null
+}
+
+/** Place an item in one of the room's corners, falling back to wall placement. */
+function placeInCorner(
+  rect: Rect, occupied: Set<string>, type: string,
+  placed: PlacedFurniture[],
+): Pos | null {
+  const fp = FOOTPRINTS[type]
+  if (!fp) return null
+  const corners: Pos[] = shuffle([
+    { col: rect.x, row: rect.y },
+    { col: rect.x + rect.w - fp.w, row: rect.y },
+    { col: rect.x, row: rect.y + rect.h - fp.h },
+    { col: rect.x + rect.w - fp.w, row: rect.y + rect.h - fp.h },
+  ])
+  for (const pos of corners) {
+    const result = tryPlaceAt(pos.col, pos.row, type, rect, occupied, placed)
+    if (result) return result
+  }
+  return placeAlongAnyWall(rect, occupied, type, placed)
+}
+
+/** Place an item near a target position, searching outward in Chebyshev distance rings. */
+function placeNear(
+  rect: Rect, occupied: Set<string>, type: string,
+  targetCol: number, targetRow: number, radius: number,
+  placed: PlacedFurniture[],
+): Pos | null {
+  const fp = FOOTPRINTS[type]
+  if (!fp) return null
+  for (let dist = 0; dist <= radius; dist++) {
+    const candidates: Pos[] = []
+    for (let dr = -dist; dr <= dist; dr++) {
+      for (let dc = -dist; dc <= dist; dc++) {
+        if (Math.max(Math.abs(dr), Math.abs(dc)) !== dist) continue
+        candidates.push({ col: targetCol + dc, row: targetRow + dr })
+      }
+    }
+    for (const pos of shuffle(candidates)) {
+      const result = tryPlaceAt(pos.col, pos.row, type, rect, occupied, placed)
+      if (result) return result
+    }
+  }
+  return null
+}
+
+/** Place at or near the center of the room. */
+function placeCentered(
+  rect: Rect, occupied: Set<string>, type: string,
+  placed: PlacedFurniture[],
+): Pos | null {
+  const fp = FOOTPRINTS[type]
+  if (!fp) return null
+  const centerCol = rect.x + Math.floor((rect.w - fp.w) / 2)
+  const centerRow = rect.y + Math.floor((rect.h - fp.h) / 2)
+  return placeNear(rect, occupied, type, centerCol, centerRow, Math.max(rect.w, rect.h), placed)
+}
+
+/** Place a workstation cluster: desk + adjacent chairs + optional PC. */
+function placeWorkstation(
+  rect: Rect, occupied: Set<string>, placed: PlacedFurniture[],
+): boolean {
+  const deskFp = FOOTPRINTS[FurnitureType.DESK]
+  if (!deskFp || rect.w < deskFp.w || rect.h < deskFp.h) return false
+
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const col = randInt(rect.x, rect.x + rect.w - deskFp.w)
+    const row = randInt(rect.y, rect.y + rect.h - deskFp.h)
+    if (!canPlace(col, row, deskFp.w, deskFp.h, rect, occupied)) continue
+
+    // Place the desk
+    placed.push({ uid: makeUid(), type: FurnitureType.DESK, col, row })
+    markOccupied(col, row, deskFp.w, deskFp.h, occupied)
+
+    // Place 1–2 chairs adjacent to the desk
+    const numChairs = randInt(1, 2)
+    const chairSpots = shuffle<Pos>([
+      { col: col, row: row + deskFp.h },
+      { col: col + 1, row: row + deskFp.h },
+      { col: col, row: row - 1 },
+      { col: col + 1, row: row - 1 },
+      { col: col - 1, row: row },
+      { col: col - 1, row: row + 1 },
+      { col: col + deskFp.w, row: row },
+      { col: col + deskFp.w, row: row + 1 },
+    ])
+    let chairsPlaced = 0
+    for (const spot of chairSpots) {
+      if (chairsPlaced >= numChairs) break
+      if (tryPlaceAt(spot.col, spot.row, FurnitureType.CHAIR, rect, occupied, placed)) {
+        chairsPlaced++
+      }
+    }
+
+    // Optionally place a PC near the desk
+    if (Math.random() < 0.6) {
+      placeNear(rect, occupied, FurnitureType.PC, col, row, 2, placed)
+    }
+
+    return true
+  }
+  return false
+}
+
+// ── Per-room-type placement ──────────────────────────────────
+
+function placeWorkspaceRoom(rect: Rect, occupied: Set<string>, placed: PlacedFurniture[]): void {
+  const area = rect.w * rect.h
+  const numWorkstations = Math.max(1, Math.floor(area / 25))
+
+  for (let i = 0; i < numWorkstations; i++) {
+    placeWorkstation(rect, occupied, placed)
+  }
+
+  if (Math.random() < 0.5) placeInCorner(rect, occupied, FurnitureType.PLANT, placed)
+  if (Math.random() < 0.3) placeInCorner(rect, occupied, FurnitureType.LAMP, placed)
+}
+
+function placeMeetingRoom(rect: Rect, occupied: Set<string>, placed: PlacedFurniture[]): void {
+  // Center desk with chairs around all sides
+  const deskPos = placeCentered(rect, occupied, FurnitureType.DESK, placed)
+  if (deskPos) {
+    const deskFp = FOOTPRINTS[FurnitureType.DESK]
+    const numChairs = randInt(3, 6)
+    const chairSpots = shuffle<Pos>([
+      { col: deskPos.col, row: deskPos.row + deskFp.h },
+      { col: deskPos.col + 1, row: deskPos.row + deskFp.h },
+      { col: deskPos.col, row: deskPos.row - 1 },
+      { col: deskPos.col + 1, row: deskPos.row - 1 },
+      { col: deskPos.col - 1, row: deskPos.row },
+      { col: deskPos.col - 1, row: deskPos.row + 1 },
+      { col: deskPos.col + deskFp.w, row: deskPos.row },
+      { col: deskPos.col + deskFp.w, row: deskPos.row + 1 },
+    ])
+    let chairsPlaced = 0
+    for (const spot of chairSpots) {
+      if (chairsPlaced >= numChairs) break
+      if (tryPlaceAt(spot.col, spot.row, FurnitureType.CHAIR, rect, occupied, placed)) {
+        chairsPlaced++
+      }
+    }
+  }
+
+  // Whiteboard on top wall
+  if (Math.random() < 0.7) {
+    placeAlongWall(rect, occupied, FurnitureType.WHITEBOARD, 'top', placed)
+  }
+}
+
+function placeKitchenRoom(rect: Rect, occupied: Set<string>, placed: PlacedFurniture[]): void {
+  // Appliances along walls
+  placeAlongAnyWall(rect, occupied, FurnitureType.COFFEE_MACHINE, placed)
+  placeAlongAnyWall(rect, occupied, FurnitureType.COOLER, placed)
+
+  // Optional couch + coffee table nearby
+  if (Math.random() < 0.6) {
+    const couchPos = placeAlongWall(rect, occupied, FurnitureType.COUCH, 'bottom', placed)
+      ?? placeAlongAnyWall(rect, occupied, FurnitureType.COUCH, placed)
+    if (couchPos) {
+      placeNear(rect, occupied, FurnitureType.COFFEE_TABLE, couchPos.col, couchPos.row - 1, 2, placed)
+    }
+  }
+
+  // 1–2 coffee tables in center area
+  const numTables = randInt(1, 2)
+  for (let i = 0; i < numTables; i++) {
+    placeCentered(rect, occupied, FurnitureType.COFFEE_TABLE, placed)
+  }
+}
+
+function placeLibraryRoom(rect: Rect, occupied: Set<string>, placed: PlacedFurniture[]): void {
+  // Bookshelves lining walls
+  const wallLength = 2 * (rect.w + rect.h)
+  const numBookshelves = Math.max(2, Math.floor(wallLength / 4))
+  const walls = shuffle<Wall>(['top', 'left', 'right', 'bottom'])
+  for (let i = 0; i < numBookshelves; i++) {
+    placeAlongWall(rect, occupied, FurnitureType.BOOKSHELF, walls[i % walls.length], placed)
+  }
+
+  // Reading chair in open space with lamp nearby
+  const chairPos = placeRandom(rect, occupied, FurnitureType.CHAIR, placed)
+  if (chairPos && Math.random() < 0.7) {
+    placeNear(rect, occupied, FurnitureType.LAMP, chairPos.col, chairPos.row, 2, placed)
+  }
+
+  if (Math.random() < 0.6) placeInCorner(rect, occupied, FurnitureType.PLANT, placed)
+}
+
+function placeStorageRoom(rect: Rect, occupied: Set<string>, placed: PlacedFurniture[]): void {
+  // Filing cabinets along walls (scales with perimeter)
+  const perimeter = 2 * (rect.w + rect.h)
+  const numCabinets = Math.max(2, Math.floor(perimeter / 6))
+  const walls = shuffle<Wall>(['left', 'right', 'top', 'bottom'])
+  for (let i = 0; i < numCabinets; i++) {
+    placeAlongWall(rect, occupied, FurnitureType.FILING_CABINET, walls[i % walls.length], placed)
+  }
+
+  // Bookshelves along remaining wall space
+  const numShelves = randInt(0, 2)
+  for (let i = 0; i < numShelves; i++) {
+    placeAlongAnyWall(rect, occupied, FurnitureType.BOOKSHELF, placed)
+  }
+
+  // Printer along wall
+  if (Math.random() < 0.6) {
+    placeAlongAnyWall(rect, occupied, FurnitureType.PRINTER, placed)
+  }
+}
+
+function placeLoungeRoom(rect: Rect, occupied: Set<string>, placed: PlacedFurniture[]): void {
+  // Rug centered
+  if (Math.random() < 0.6) placeCentered(rect, occupied, FurnitureType.RUG, placed)
+
+  // Couches along walls with coffee tables nearby
+  const numCouches = randInt(1, 2)
+  for (let i = 0; i < numCouches; i++) {
+    const couchPos = placeAlongAnyWall(rect, occupied, FurnitureType.COUCH, placed)
+    if (couchPos) {
+      placeNear(rect, occupied, FurnitureType.COFFEE_TABLE, couchPos.col, couchPos.row, 2, placed)
+    }
+  }
+
+  // Corner plants and trees
+  if (Math.random() < 0.5) placeInCorner(rect, occupied, FurnitureType.POTTED_TREE, placed)
+  const numPlants = randInt(0, 2)
+  for (let i = 0; i < numPlants; i++) {
+    placeInCorner(rect, occupied, FurnitureType.PLANT, placed)
+  }
+}
+
+function placeManagerRoom(rect: Rect, occupied: Set<string>, placed: PlacedFurniture[]): void {
+  const deskFp = FOOTPRINTS[FurnitureType.DESK]
+
+  // Desk in back half (toward top wall, centered horizontally)
+  const backRow = rect.y + Math.max(0, Math.floor((rect.h - deskFp.h) / 3))
+  const centerCol = rect.x + Math.floor((rect.w - deskFp.w) / 2)
+  const deskPos = placeNear(rect, occupied, FurnitureType.DESK, centerCol, backRow, Math.max(rect.w, rect.h), placed)
+
+  if (deskPos) {
+    // Chairs in front of desk
+    const numChairs = randInt(1, 2)
+    const chairSpots = shuffle<Pos>([
+      { col: deskPos.col, row: deskPos.row + deskFp.h },
+      { col: deskPos.col + 1, row: deskPos.row + deskFp.h },
+      { col: deskPos.col - 1, row: deskPos.row + deskFp.h - 1 },
+      { col: deskPos.col + deskFp.w, row: deskPos.row + deskFp.h - 1 },
+    ])
+    let chairsPlaced = 0
+    for (const spot of chairSpots) {
+      if (chairsPlaced >= numChairs) break
+      if (tryPlaceAt(spot.col, spot.row, FurnitureType.CHAIR, rect, occupied, placed)) {
+        chairsPlaced++
+      }
+    }
+  }
+
+  // Bookshelf along wall
+  if (Math.random() < 0.6) placeAlongAnyWall(rect, occupied, FurnitureType.BOOKSHELF, placed)
+
+  // Corner plant + lamp
+  if (Math.random() < 0.6) placeInCorner(rect, occupied, FurnitureType.PLANT, placed)
+  if (Math.random() < 0.5) placeInCorner(rect, occupied, FurnitureType.LAMP, placed)
+}
+
+// ── Main room placement dispatcher ───────────────────────────
+
+function placeFurnitureInRoom(rect: Rect, roomType: RoomType): PlacedFurniture[] {
   const placed: PlacedFurniture[] = []
   const occupied = new Set<string>()
 
-  for (const recipe of def.furniture) {
-    const countVal = Array.isArray(recipe.count)
-      ? randInt(recipe.count[0], recipe.count[1])
-      : recipe.count
-    const fp = FOOTPRINTS[recipe.type]
-    if (!fp) continue
-
-    for (let i = 0; i < countVal; i++) {
-      // Try random positions within the room
-      let didPlace = false
-      for (let attempt = 0; attempt < 30; attempt++) {
-        const col = randInt(rect.x, rect.x + rect.w - fp.w)
-        const row = randInt(rect.y, rect.y + rect.h - fp.h)
-        if (canPlace(col, row, fp.w, fp.h, rect, occupied)) {
-          const uid = `r-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-          placed.push({ uid, type: recipe.type, col, row })
-          // Mark tiles as occupied
-          for (let dr = 0; dr < fp.h; dr++) {
-            for (let dc = 0; dc < fp.w; dc++) {
-              occupied.add(`${col + dc},${row + dr}`)
-            }
-          }
-          didPlace = true
-          break
-        }
-      }
-      if (!didPlace) break // can't fit more of this type
-    }
+  switch (roomType) {
+    case 'workspace': placeWorkspaceRoom(rect, occupied, placed); break
+    case 'meeting':   placeMeetingRoom(rect, occupied, placed); break
+    case 'kitchen':   placeKitchenRoom(rect, occupied, placed); break
+    case 'library':   placeLibraryRoom(rect, occupied, placed); break
+    case 'storage':   placeStorageRoom(rect, occupied, placed); break
+    case 'lounge':    placeLoungeRoom(rect, occupied, placed); break
+    case 'manager':   placeManagerRoom(rect, occupied, placed); break
   }
 
   return placed
