@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { EditTool } from '../types.js'
 import type { TileType as TileTypeVal, FloorColor } from '../types.js'
+import '../layout/expandedCatalog.js'
 import { getCatalogByCategory, buildDynamicCatalog, getActiveCategories } from '../layout/furnitureCatalog.js'
 import type { FurnitureCategory, LoadedAssetData } from '../layout/furnitureCatalog.js'
 import { getCachedSprite } from '../sprites/spriteCache.js'
@@ -159,6 +160,7 @@ export function EditorToolbar({
   const [showColor, setShowColor] = useState(false)
   const [showWallColor, setShowWallColor] = useState(false)
   const [showFurnitureColor, setShowFurnitureColor] = useState(false)
+  const [hoveredEntry, setHoveredEntry] = useState<string | null>(null)
 
   // Build dynamic catalog from loaded assets
   useEffect(() => {
@@ -381,7 +383,11 @@ export function EditorToolbar({
                 <button
                   key={entry.type}
                   onClick={() => onFurnitureTypeChange(entry.type)}
-                  title={entry.label}
+                  onMouseEnter={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect()
+                    setHoveredEntry(`${entry.label}::${rect.left + rect.width / 2}::${rect.top}`)
+                  }}
+                  onMouseLeave={() => setHoveredEntry(null)}
                   style={{
                     width: thumbSize,
                     height: thumbSize,
@@ -417,6 +423,32 @@ export function EditorToolbar({
               )
             })}
           </div>
+          {/* Hover tooltip — rendered outside scroll container via fixed positioning */}
+          {hoveredEntry && (() => {
+            const [label, xStr, yStr] = hoveredEntry.split('::')
+            const x = Number(xStr)
+            const y = Number(yStr)
+            return (
+              <div style={{
+                position: 'fixed',
+                left: x,
+                top: y - 4,
+                transform: 'translate(-50%, -100%)',
+                background: '#1e1e2e',
+                border: '2px solid #4a4a6a',
+                borderRadius: 0,
+                padding: '2px 6px',
+                fontSize: '18px',
+                color: 'rgba(255, 255, 255, 0.85)',
+                whiteSpace: 'nowrap',
+                pointerEvents: 'none',
+                zIndex: 200,
+                boxShadow: '2px 2px 0px #0a0a14',
+              }}>
+                {label}
+              </div>
+            )
+          })()}
         </div>
       )}
 
