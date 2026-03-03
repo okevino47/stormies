@@ -6,6 +6,8 @@ A JetBrains IDE plugin that brings your Claude Code agents to life as animated p
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.1.0-purple?logo=kotlin)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
+![Stormies - Pixel Agents](screenshot.png)
+
 ## What It Does
 
 The plugin monitors Claude Code's session transcript files (`~/.claude/projects/`) and translates agent activity into pixel art animations. When an agent uses a tool, writes code, or waits for permission, its character reacts accordingly — no modifications to Claude Code needed.
