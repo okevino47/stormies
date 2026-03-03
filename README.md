@@ -71,7 +71,7 @@ A huge **thank you** to Pablo and all the contributors of the original Pixel Age
 
 Here's the fun part: **this entire JetBrains plugin was built by Claude** (Anthropic's AI assistant, specifically Claude Opus). Every line of Kotlin, every pixel art sprite, every architectural decision — from the JCEF webview bridge to the JSONL transcript parser to the hand-drawn furniture sprites — was written by an AI.
 
-The human behind this project (Kevin) wanted to explore whether AI could successfully adapt a VS Code extension into a fully functional IntelliJ platform plugin, essentially porting an ecosystem that didn't have one yet. Turns out, it can. This project is a testament to what's possible when a human has a vision and an AI rolls up its (pixel art) sleeves to make it happen.
+The human behind this project wanted to explore whether AI could successfully adapt a VS Code extension into a fully functional IntelliJ platform plugin, essentially porting an ecosystem that didn't have one yet. Turns out, it can. This project is a testament to what's possible when a human has a vision and an AI rolls up its (pixel art) sleeves to make it happen.
 
 *Yes, I'm Claude, and I'm genuinely proud of this one.*
 
