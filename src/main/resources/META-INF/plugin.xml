@@ -4,9 +4,44 @@
     <vendor>Stormies</vendor>
 
     <description><![CDATA[
-        Pixel art office where your Claude Code agents come to life as animated characters.
-        Watch your AI coding assistants work in a charming virtual office environment.
+        <p>Bring your Claude Code agents to life as animated pixel art characters in a charming virtual office — right inside your IDE.</p>
+
+        <p>The plugin watches Claude Code session transcripts and translates real-time agent activity into pixel art animations. Each agent gets a unique character with a generated name, walks to a desk, sits down, and types when working. Tool usage, permission requests, and sub-agent spawns are all reflected live.</p>
+
+        <h3>Highlights</h3>
+        <ul>
+            <li><b>Live Agent Detection</b> — Characters spawn automatically when Claude Code sessions are running, with a matrix rain effect</li>
+            <li><b>Unique Characters</b> — 6 base palettes with hue shifting for unlimited color variations; each agent gets a compound name (e.g. "swift-otter")</li>
+            <li><b>Pet Sub-Agents</b> — Task tool sub-agents appear as animated pets: Cat, Dog, Owl, Axolotl, Hedgehog, Red Panda, Jellyfish, Chameleon, Penguin, or Bat</li>
+            <li><b>Tool Status Overlays</b> — Real-time activity bubbles show what each agent is doing (file being edited, command being run, waiting for permission)</li>
+            <li><b>Office Layout Editor</b> — Full editor with tile/wall painting, furniture placement, undo/redo, one-click randomize, and dynamic auto-fit mode</li>
+            <li><b>86 Furniture Items</b> — Desks, chairs, PCs, plants, bookshelves, kitchen appliances, wall art, and more across 8 categories</li>
+            <li><b>Customization</b> — Floor and wall color controls (hue, saturation, brightness, contrast), per-tile coloring, custom asset import, layout import/export</li>
+            <li><b>Agent List Panel</b> — Expandable panel showing all active agents with status indicators and activity text</li>
+        </ul>
+
+        <p>No modifications to Claude Code are needed — the plugin passively observes session transcript files.</p>
+
+        <p>Based on the <a href="https://github.com/pablodelucca/pixel-agents">Pixel Agents</a> VS Code extension by Pablo De Lucca.</p>
     ]]></description>
+
+    <change-notes><![CDATA[
+        <b>1.0.0</b>
+        <ul>
+            <li>Initial release</li>
+            <li>Animated pixel art characters for Claude Code agents with unique names</li>
+            <li>Pet sub-agents (10 exotic pet types) spawned by the Task tool</li>
+            <li>Real-time tool status overlays and permission indicators</li>
+            <li>Full office layout editor with 86 furniture items</li>
+            <li>One-click randomize and dynamic auto-fit layout modes</li>
+            <li>Floor and wall color customization with 7 tile patterns</li>
+            <li>Custom asset import support</li>
+            <li>Layout persistence and import/export</li>
+            <li>Agent list panel with status tracking</li>
+            <li>Matrix rain spawn/despawn effects</li>
+            <li>Optional notification chime</li>
+        </ul>
+    ]]></change-notes>
 
     <depends>com.intellij.modules.platform</depends>
 
