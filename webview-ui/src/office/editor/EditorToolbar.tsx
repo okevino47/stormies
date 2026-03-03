@@ -56,6 +56,8 @@ interface EditorToolbarProps {
   onSelectedFurnitureColorChange: (color: FloorColor | null) => void
   onFurnitureTypeChange: (type: string) => void
   onRandomize: (width: number, height: number, numRooms: number) => void
+  onDynamic: () => void
+  isDynamicMode: boolean
   loadedAssets?: LoadedAssetData
 }
 
@@ -156,6 +158,8 @@ export function EditorToolbar({
   onSelectedFurnitureColorChange,
   onFurnitureTypeChange,
   onRandomize,
+  onDynamic,
+  isDynamicMode,
   loadedAssets,
 }: EditorToolbarProps) {
   const [activeCategory, setActiveCategory] = useState<FurnitureCategory>('desks')
@@ -273,6 +277,13 @@ export function EditorToolbar({
           title="Generate random layout"
         >
           Randomize
+        </button>
+        <button
+          style={isDynamicMode ? activeBtnStyle : btnStyle}
+          onClick={onDynamic}
+          title="Auto-fit layout to window size"
+        >
+          Dynamic
         </button>
       </div>
 

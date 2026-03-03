@@ -208,6 +208,9 @@ function App() {
         zoom={editor.zoom}
         onZoomChange={editor.handleZoomChange}
         panRef={editor.panRef}
+        isDynamicMode={editor.isDynamicMode}
+        canvasSizeRef={editor.canvasSizeRef}
+        onDynamicFitZoom={editor.handleDynamicFitZoom}
       />
 
       <ZoomControls zoom={editor.zoom} onZoomChange={editor.handleZoomChange} />
@@ -281,6 +284,8 @@ function App() {
             onSelectedFurnitureColorChange={editor.handleSelectedFurnitureColorChange}
             onFurnitureTypeChange={editor.handleFurnitureTypeChange}
             onRandomize={editor.handleRandomize}
+            onDynamic={editor.handleDynamic}
+            isDynamicMode={editor.isDynamicMode}
             loadedAssets={loadedAssets}
           />
         )

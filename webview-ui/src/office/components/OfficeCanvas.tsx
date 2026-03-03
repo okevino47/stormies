@@ -26,9 +26,12 @@ interface OfficeCanvasProps {
   zoom: number
   onZoomChange: (zoom: number) => void
   panRef: React.MutableRefObject<{ x: number; y: number }>
+  isDynamicMode: boolean
+  canvasSizeRef: React.MutableRefObject<{ width: number; height: number }>
+  onDynamicFitZoom: (zoom: number) => void
 }
 
-export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, onEditorTileAction, onEditorEraseAction, onEditorSelectionChange, onDeleteSelected, onRotateSelected, onDragMove, editorTick: _editorTick, zoom, onZoomChange, panRef }: OfficeCanvasProps) {
+export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, onEditorTileAction, onEditorEraseAction, onEditorSelectionChange, onDeleteSelected, onRotateSelected, onDragMove, editorTick: _editorTick, zoom, onZoomChange, panRef, isDynamicMode, canvasSizeRef, onDynamicFitZoom }: OfficeCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const offsetRef = useRef({ x: 0, y: 0 })
@@ -71,8 +74,10 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
     canvas.height = Math.round(rect.height * dpr)
     canvas.style.width = `${rect.width}px`
     canvas.style.height = `${rect.height}px`
+    // Write device-pixel dimensions for dynamic layout calculations
+    canvasSizeRef.current = { width: canvas.width, height: canvas.height }
     // No ctx.scale(dpr) — we render directly in device pixels
-  }, [])
+  }, [canvasSizeRef])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -80,7 +85,23 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
 
     resizeCanvas()
 
-    const observer = new ResizeObserver(() => resizeCanvas())
+    const observer = new ResizeObserver(() => {
+      resizeCanvas()
+      // Auto-fit zoom when in dynamic mode
+      if (isDynamicMode) {
+        const canvasW = canvasSizeRef.current.width
+        const canvasH = canvasSizeRef.current.height
+        if (canvasW > 0 && canvasH > 0) {
+          const layout = officeState.getLayout()
+          const fitZoomX = Math.floor(canvasW / (layout.cols * TILE_SIZE))
+          const fitZoomY = Math.floor(canvasH / (layout.rows * TILE_SIZE))
+          const fitZoom = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.min(fitZoomX, fitZoomY)))
+          if (fitZoom !== zoom) {
+            onDynamicFitZoom(fitZoom)
+          }
+        }
+      }
+    })
     if (containerRef.current) {
       observer.observe(containerRef.current)
     }
@@ -231,7 +252,7 @@ export function OfficeCanvas({ officeState, onClick, isEditMode, editorState, on
       stop()
       observer.disconnect()
     }
-  }, [officeState, resizeCanvas, isEditMode, editorState, _editorTick, zoom, panRef])
+  }, [officeState, resizeCanvas, isEditMode, editorState, _editorTick, zoom, panRef, isDynamicMode, canvasSizeRef, onDynamicFitZoom])
 
   // Convert CSS mouse coords to world (sprite pixel) coords
   const screenToWorld = useCallback(

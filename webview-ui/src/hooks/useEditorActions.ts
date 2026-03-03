@@ -10,14 +10,17 @@ import type { ExpandDirection } from '../office/editor/editorActions.js'
 import { getCatalogEntry, getRotatedType, getToggledType } from '../office/layout/furnitureCatalog.js'
 import { defaultZoom } from '../office/toolUtils.js'
 import { vscode } from '../vscodeApi.js'
-import { LAYOUT_SAVE_DEBOUNCE_MS, ZOOM_MIN, ZOOM_MAX } from '../constants.js'
+import { LAYOUT_SAVE_DEBOUNCE_MS, ZOOM_MIN, ZOOM_MAX, MIN_DYNAMIC_COLS, MIN_DYNAMIC_ROWS, MAX_COLS, MAX_ROWS } from '../constants.js'
+import { TILE_SIZE } from '../office/types.js'
 
 export interface EditorActions {
   isEditMode: boolean
   editorTick: number
   isDirty: boolean
+  isDynamicMode: boolean
   zoom: number
   panRef: React.MutableRefObject<{ x: number; y: number }>
+  canvasSizeRef: React.MutableRefObject<{ width: number; height: number }>
   saveTimerRef: React.MutableRefObject<ReturnType<typeof setTimeout> | null>
   setLastSavedLayout: (layout: OfficeLayout) => void
   handleOpenClaude: () => void
@@ -40,6 +43,8 @@ export interface EditorActions {
   handleEditorEraseAction: (col: number, row: number) => void
   handleEditorSelectionChange: () => void
   handleRandomize: (width: number, height: number, numRooms: number) => void
+  handleDynamic: () => void
+  handleDynamicFitZoom: (zoom: number) => void
   handleDragMove: (uid: string, newCol: number, newRow: number) => void
 }
 
@@ -50,9 +55,11 @@ export function useEditorActions(
   const [isEditMode, setIsEditMode] = useState(false)
   const [editorTick, setEditorTick] = useState(0)
   const [isDirty, setIsDirty] = useState(false)
+  const [isDynamicMode, setIsDynamicMode] = useState(false)
   const [zoom, setZoom] = useState(defaultZoom)
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const panRef = useRef({ x: 0, y: 0 })
+  const canvasSizeRef = useRef({ width: 0, height: 0 })
   const lastSavedLayoutRef = useRef<OfficeLayout | null>(null)
 
   // Called by useExtensionMessages on layoutLoaded to set the initial checkpoint
@@ -318,6 +325,7 @@ export function useEditorActions(
 
   const handleZoomChange = useCallback((newZoom: number) => {
     setZoom(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom)))
+    setIsDynamicMode(false)
   }, [])
 
   const handleRandomize = useCallback((width: number, height: number, numRooms: number) => {
@@ -326,7 +334,34 @@ export function useEditorActions(
     editorState.clearSelection()
     editorState.clearGhost()
     editorState.clearDrag()
+    setIsDynamicMode(false)
   }, [applyEdit, editorState])
+
+  const handleDynamic = useCallback(() => {
+    const canvasW = canvasSizeRef.current.width
+    const canvasH = canvasSizeRef.current.height
+    if (canvasW === 0 || canvasH === 0) return
+
+    const optimalZoom = defaultZoom()
+    const cols = Math.max(MIN_DYNAMIC_COLS, Math.min(MAX_COLS, Math.floor(canvasW / (TILE_SIZE * optimalZoom))))
+    const rows = Math.max(MIN_DYNAMIC_ROWS, Math.min(MAX_ROWS, Math.floor(canvasH / (TILE_SIZE * optimalZoom))))
+    const numRooms = Math.max(2, Math.min(10, Math.floor(Math.sqrt(cols * rows) / 3)))
+
+    const newLayout = generateRandomLayout(cols, rows, numRooms)
+    applyEdit(newLayout)
+    editorState.clearSelection()
+    editorState.clearGhost()
+    editorState.clearDrag()
+
+    setZoom(optimalZoom)
+    panRef.current = { x: 0, y: 0 }
+    setIsDynamicMode(true)
+  }, [applyEdit, editorState])
+
+  // Set zoom without disabling dynamic mode (called by resize observer auto-fit)
+  const handleDynamicFitZoom = useCallback((newZoom: number) => {
+    setZoom(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom)))
+  }, [])
 
   const handleDragMove = useCallback((uid: string, newCol: number, newRow: number) => {
     const os = getOfficeState()
@@ -509,8 +544,10 @@ export function useEditorActions(
     isEditMode,
     editorTick,
     isDirty,
+    isDynamicMode,
     zoom,
     panRef,
+    canvasSizeRef,
     saveTimerRef,
     setLastSavedLayout,
     handleOpenClaude,
@@ -532,6 +569,8 @@ export function useEditorActions(
     handleEditorTileAction,
     handleEditorEraseAction,
     handleRandomize,
+    handleDynamic,
+    handleDynamicFitZoom,
     handleEditorSelectionChange,
     handleDragMove,
   }
