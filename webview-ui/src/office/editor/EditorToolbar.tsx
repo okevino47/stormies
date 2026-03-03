@@ -55,6 +55,7 @@ interface EditorToolbarProps {
   onWallColorChange: (color: FloorColor) => void
   onSelectedFurnitureColorChange: (color: FloorColor | null) => void
   onFurnitureTypeChange: (type: string) => void
+  onRandomize: (width: number, height: number, numRooms: number) => void
   loadedAssets?: LoadedAssetData
 }
 
@@ -154,6 +155,7 @@ export function EditorToolbar({
   onWallColorChange,
   onSelectedFurnitureColorChange,
   onFurnitureTypeChange,
+  onRandomize,
   loadedAssets,
 }: EditorToolbarProps) {
   const [activeCategory, setActiveCategory] = useState<FurnitureCategory>('desks')
@@ -161,6 +163,10 @@ export function EditorToolbar({
   const [showWallColor, setShowWallColor] = useState(false)
   const [showFurnitureColor, setShowFurnitureColor] = useState(false)
   const [hoveredEntry, setHoveredEntry] = useState<string | null>(null)
+  const [showRandomize, setShowRandomize] = useState(false)
+  const [randWidth, setRandWidth] = useState(20)
+  const [randHeight, setRandHeight] = useState(11)
+  const [randRooms, setRandRooms] = useState(3)
 
   // Build dynamic catalog from loaded assets
   useEffect(() => {
@@ -259,6 +265,14 @@ export function EditorToolbar({
           title="Place furniture"
         >
           Furniture
+        </button>
+        <div style={{ width: 1, height: 14, background: 'rgba(255,255,255,0.15)', margin: '0 2px', alignSelf: 'center', flexShrink: 0 }} />
+        <button
+          style={showRandomize ? activeBtnStyle : btnStyle}
+          onClick={() => setShowRandomize((v) => !v)}
+          title="Generate random layout"
+        >
+          Randomize
         </button>
       </div>
 
@@ -507,6 +521,33 @@ export function EditorToolbar({
               </label>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Randomize panel */}
+      {showRandomize && (
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          padding: '6px 8px',
+          background: '#181828',
+          border: '2px solid #4a4a6a',
+          borderRadius: 0,
+        }}>
+          <span style={{ fontSize: '20px', color: 'rgba(255, 255, 255, 0.8)' }}>Randomize Layout</span>
+          <ColorSlider label="W" value={randWidth} min={10} max={64} onChange={setRandWidth} />
+          <ColorSlider label="H" value={randHeight} min={8} max={64} onChange={setRandHeight} />
+          <ColorSlider label="Rm" value={randRooms} min={1} max={8} onChange={setRandRooms} />
+          <button
+            style={{ ...btnStyle, textAlign: 'center', fontSize: '20px', padding: '4px 12px' }}
+            onClick={() => {
+              onRandomize(randWidth, randHeight, randRooms)
+              setShowRandomize(false)
+            }}
+          >
+            Generate
+          </button>
         </div>
       )}
     </div>

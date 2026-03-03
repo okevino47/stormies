@@ -5,6 +5,7 @@ import { EditTool } from '../office/types.js'
 import { TileType } from '../office/types.js'
 import type { OfficeLayout, EditTool as EditToolType, TileType as TileTypeVal, FloorColor, PlacedFurniture } from '../office/types.js'
 import { paintTile, placeFurniture, removeFurniture, moveFurniture, rotateFurniture, toggleFurnitureState, canPlaceFurniture, getWallPlacementRow, expandLayout } from '../office/editor/editorActions.js'
+import { generateRandomLayout } from '../office/layout/layoutRandomizer.js'
 import type { ExpandDirection } from '../office/editor/editorActions.js'
 import { getCatalogEntry, getRotatedType, getToggledType } from '../office/layout/furnitureCatalog.js'
 import { defaultZoom } from '../office/toolUtils.js'
@@ -38,6 +39,7 @@ export interface EditorActions {
   handleEditorTileAction: (col: number, row: number) => void
   handleEditorEraseAction: (col: number, row: number) => void
   handleEditorSelectionChange: () => void
+  handleRandomize: (width: number, height: number, numRooms: number) => void
   handleDragMove: (uid: string, newCol: number, newRow: number) => void
 }
 
@@ -318,6 +320,14 @@ export function useEditorActions(
     setZoom(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, newZoom)))
   }, [])
 
+  const handleRandomize = useCallback((width: number, height: number, numRooms: number) => {
+    const newLayout = generateRandomLayout(width, height, numRooms)
+    applyEdit(newLayout)
+    editorState.clearSelection()
+    editorState.clearGhost()
+    editorState.clearDrag()
+  }, [applyEdit, editorState])
+
   const handleDragMove = useCallback((uid: string, newCol: number, newRow: number) => {
     const os = getOfficeState()
     const layout = os.getLayout()
@@ -521,6 +531,7 @@ export function useEditorActions(
     handleZoomChange,
     handleEditorTileAction,
     handleEditorEraseAction,
+    handleRandomize,
     handleEditorSelectionChange,
     handleDragMove,
   }

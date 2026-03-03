@@ -15,3 +15,4 @@ export {
   getWalkableTiles,
   findPath,
 } from './tileMap.js'
+export { generateRandomLayout } from './layoutRandomizer.js'

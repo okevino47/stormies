@@ -280,6 +280,7 @@ function App() {
             onWallColorChange={editor.handleWallColorChange}
             onSelectedFurnitureColorChange={editor.handleSelectedFurnitureColorChange}
             onFurnitureTypeChange={editor.handleFurnitureTypeChange}
+            onRandomize={editor.handleRandomize}
             loadedAssets={loadedAssets}
           />
         )
