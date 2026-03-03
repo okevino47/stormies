@@ -13,6 +13,7 @@ import { useEditorActions } from './hooks/useEditorActions.js'
 import { useEditorKeyboard } from './hooks/useEditorKeyboard.js'
 import { ZoomControls } from './components/ZoomControls.js'
 import { BottomToolbar } from './components/BottomToolbar.js'
+import { AgentListPanel } from './components/AgentListPanel.js'
 import { DebugView } from './components/DebugView.js'
 
 // Game state lives outside React — updated imperatively by message handlers
@@ -300,6 +301,14 @@ function App() {
         zoom={editor.zoom}
         panRef={editor.panRef}
         onCloseAgent={handleCloseAgent}
+      />
+
+      <AgentListPanel
+        officeState={officeState}
+        agents={agents}
+        agentTools={agentTools}
+        subagentCharacters={subagentCharacters}
+        onSelectAgent={handleSelectAgent}
       />
 
       {isDebugMode && (

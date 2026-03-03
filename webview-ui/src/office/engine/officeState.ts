@@ -1,4 +1,4 @@
-import { TILE_SIZE, MATRIX_EFFECT_DURATION, CharacterState, Direction } from '../types.js'
+import { TILE_SIZE, MATRIX_EFFECT_DURATION, CharacterState, Direction, PET_TYPE_COUNT } from '../types.js'
 import {
   PALETTE_COUNT,
   HUE_SHIFT_MIN_DEG,
@@ -15,6 +15,8 @@ import {
 } from '../../constants.js'
 import type { Character, Seat, FurnitureInstance, TileType as TileTypeVal, OfficeLayout, PlacedFurniture } from '../types.js'
 import { createCharacter, updateCharacter } from './characters.js'
+import { generateName } from './agentNames.js'
+import { generatePetName } from './petNames.js'
 import { matrixEffectSeeds } from './matrixEffect.js'
 import { isWalkable, getWalkableTiles, findPath } from '../layout/tileMap.js'
 import {
@@ -37,6 +39,7 @@ export class OfficeState {
   selectedAgentId: number | null = null
   cameraFollowId: number | null = null
   hoveredAgentId: number | null = null
+  panelHoveredAgentId: number | null = null
   hoveredTile: { col: number; row: number } | null = null
   /** Maps "parentId:toolId" → sub-agent character ID (negative) */
   subagentIdMap: Map<string, number> = new Map()
@@ -193,7 +196,7 @@ export class OfficeState {
     return { palette, hueShift }
   }
 
-  addAgent(id: number, preferredPalette?: number, preferredHueShift?: number, preferredSeatId?: string, skipSpawnEffect?: boolean, folderName?: string): void {
+  addAgent(id: number, preferredPalette?: number, preferredHueShift?: number, preferredSeatId?: string, skipSpawnEffect?: boolean, folderName?: string, preferredName?: string): void {
     if (this.characters.has(id)) return
 
     let palette: number
@@ -205,6 +208,16 @@ export class OfficeState {
       const pick = this.pickDiversePalette()
       palette = pick.palette
       hueShift = pick.hueShift
+    }
+
+    // Resolve name
+    let name = preferredName
+    if (!name) {
+      const usedNames = new Set<string>()
+      for (const ch of this.characters.values()) {
+        if (ch.name) usedNames.add(ch.name)
+      }
+      name = generateName(usedNames)
     }
 
     // Try preferred seat first, then any free seat
@@ -223,13 +236,13 @@ export class OfficeState {
     if (seatId) {
       const seat = this.seats.get(seatId)!
       seat.assigned = true
-      ch = createCharacter(id, palette, seatId, seat, hueShift)
+      ch = createCharacter(id, palette, seatId, seat, hueShift, name)
     } else {
       // No seats — spawn at random walkable tile
       const spawn = this.walkableTiles.length > 0
         ? this.walkableTiles[Math.floor(Math.random() * this.walkableTiles.length)]
         : { col: 1, row: 1 }
-      ch = createCharacter(id, palette, null, null, hueShift)
+      ch = createCharacter(id, palette, null, null, hueShift, name)
       ch.x = spawn.col * TILE_SIZE + TILE_SIZE / 2
       ch.y = spawn.row * TILE_SIZE + TILE_SIZE / 2
       ch.tileCol = spawn.col
@@ -357,15 +370,21 @@ export class OfficeState {
     return true
   }
 
-  /** Create a sub-agent character with the parent's palette. Returns the sub-agent ID. */
+  /** Create a sub-agent pet character near the parent. Returns the sub-agent ID. */
   addSubagent(parentAgentId: number, parentToolId: string): number {
     const key = `${parentAgentId}:${parentToolId}`
     if (this.subagentIdMap.has(key)) return this.subagentIdMap.get(key)!
 
     const id = this.nextSubagentId--
     const parentCh = this.characters.get(parentAgentId)
-    const palette = parentCh ? parentCh.palette : 0
-    const hueShift = parentCh ? parentCh.hueShift : 0
+
+    // Assign random pet type and generate pet name
+    const petType = Math.floor(Math.random() * PET_TYPE_COUNT)
+    const usedNames = new Set<string>()
+    for (const ch of this.characters.values()) {
+      if (ch.name) usedNames.add(ch.name)
+    }
+    const petName = generatePetName(usedNames)
 
     // Find the free seat closest to the parent agent
     const parentCol = parentCh ? parentCh.tileCol : 0
@@ -389,7 +408,7 @@ export class OfficeState {
     if (bestSeatId) {
       const seat = this.seats.get(bestSeatId)!
       seat.assigned = true
-      ch = createCharacter(id, palette, bestSeatId, seat, hueShift)
+      ch = createCharacter(id, 0, bestSeatId, seat, 0, petName)
     } else {
       // No seats — spawn at closest walkable tile to parent
       let spawn = { col: 1, row: 1 }
@@ -405,7 +424,7 @@ export class OfficeState {
         }
         spawn = closest
       }
-      ch = createCharacter(id, palette, null, null, hueShift)
+      ch = createCharacter(id, 0, null, null, 0, petName)
       ch.x = spawn.col * TILE_SIZE + TILE_SIZE / 2
       ch.y = spawn.row * TILE_SIZE + TILE_SIZE / 2
       ch.tileCol = spawn.col
@@ -413,6 +432,7 @@ export class OfficeState {
     }
     ch.isSubagent = true
     ch.parentAgentId = parentAgentId
+    ch.petType = petType
     ch.matrixEffect = 'spawn'
     ch.matrixEffectTimer = 0
     ch.matrixEffectSeeds = matrixEffectSeeds()

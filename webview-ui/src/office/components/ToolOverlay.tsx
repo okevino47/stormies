@@ -17,7 +17,7 @@ interface ToolOverlayProps {
 }
 
 /** Derive a short human-readable activity string from tools/status */
-function getActivityText(
+export function getActivityText(
   agentId: number,
   agentTools: Record<number, ToolActivity[]>,
   isActive: boolean,
@@ -87,10 +87,11 @@ export function ToolOverlay({
 
         const isSelected = selectedId === id
         const isHovered = hoveredId === id
+        const isPanelHovered = officeState.panelHoveredAgentId === id
         const isSub = ch.isSubagent
 
-        // Only show for hovered or selected agents
-        if (!isSelected && !isHovered) return null
+        // Only show for hovered, selected, or panel-hovered agents
+        if (!isSelected && !isHovered && !isPanelHovered) return null
 
         // Position above character
         const sittingOffset = ch.state === CharacterState.TYPE ? CHARACTER_SITTING_OFFSET_PX : 0
@@ -139,6 +140,18 @@ export function ToolOverlay({
               zIndex: isSelected ? 'var(--pixel-overlay-selected-z)' : 'var(--pixel-overlay-z)',
             }}
           >
+            {ch.name && (
+              <span
+                style={{
+                  fontSize: '16px',
+                  color: 'var(--pixel-text-dim)',
+                  whiteSpace: 'nowrap',
+                  marginBottom: 2,
+                }}
+              >
+                {ch.name}
+              </span>
+            )}
             <div
               style={{
                 display: 'flex',

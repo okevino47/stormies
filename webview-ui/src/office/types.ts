@@ -204,4 +204,10 @@ export interface Character {
   matrixEffectSeeds: number[]
   /** Workspace folder name (only set for multi-root workspaces) */
   folderName?: string
+  /** Fun compound name for this character (e.g. "swift-otter") */
+  name?: string
+  /** Pet type index (0-9) if this is a pet sub-agent, undefined for humanoid */
+  petType?: number
 }
+
+export const PET_TYPE_COUNT = 10

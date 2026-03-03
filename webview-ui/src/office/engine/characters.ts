@@ -46,6 +46,7 @@ export function createCharacter(
   seatId: string | null,
   seat: Seat | null,
   hueShift = 0,
+  name?: string,
 ): Character {
   const col = seat ? seat.seatCol : 1
   const row = seat ? seat.seatRow : 1
@@ -78,6 +79,7 @@ export function createCharacter(
     matrixEffect: null,
     matrixEffectTimer: 0,
     matrixEffectSeeds: [],
+    name,
   }
 }
 

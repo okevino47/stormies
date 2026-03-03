@@ -53,10 +53,10 @@ export interface ExtensionMessageState {
 }
 
 function saveAgentSeats(os: OfficeState): void {
-  const seats: Record<number, { palette: number; hueShift: number; seatId: string | null }> = {}
+  const seats: Record<number, { palette: number; hueShift: number; seatId: string | null; name?: string }> = {}
   for (const ch of os.characters.values()) {
     if (ch.isSubagent) continue
-    seats[ch.id] = { palette: ch.palette, hueShift: ch.hueShift, seatId: ch.seatId }
+    seats[ch.id] = { palette: ch.palette, hueShift: ch.hueShift, seatId: ch.seatId, name: ch.name }
   }
   vscode.postMessage({ type: 'saveAgentSeats', seats })
 }
@@ -81,7 +81,7 @@ export function useExtensionMessages(
 
   useEffect(() => {
     // Buffer agents from existingAgents until layout is loaded
-    let pendingAgents: Array<{ id: number; palette?: number; hueShift?: number; seatId?: string; folderName?: string }> = []
+    let pendingAgents: Array<{ id: number; palette?: number; hueShift?: number; seatId?: string; folderName?: string; name?: string }> = []
 
     const handler = (e: MessageEvent) => {
       const msg = e.data
@@ -104,7 +104,7 @@ export function useExtensionMessages(
         }
         // Add buffered agents now that layout (and seats) are correct
         for (const p of pendingAgents) {
-          os.addAgent(p.id, p.palette, p.hueShift, p.seatId, true, p.folderName)
+          os.addAgent(p.id, p.palette, p.hueShift, p.seatId, true, p.folderName, p.name)
         }
         pendingAgents = []
         layoutReadyRef.current = true
@@ -147,12 +147,12 @@ export function useExtensionMessages(
         os.removeAgent(id)
       } else if (msg.type === 'existingAgents') {
         const incoming = msg.agents as number[]
-        const meta = (msg.agentMeta || {}) as Record<number, { palette?: number; hueShift?: number; seatId?: string }>
+        const meta = (msg.agentMeta || {}) as Record<number, { palette?: number; hueShift?: number; seatId?: string; name?: string }>
         const folderNames = (msg.folderNames || {}) as Record<number, string>
         // Buffer agents — they'll be added in layoutLoaded after seats are built
         for (const id of incoming) {
           const m = meta[id]
-          pendingAgents.push({ id, palette: m?.palette, hueShift: m?.hueShift, seatId: m?.seatId, folderName: folderNames[id] })
+          pendingAgents.push({ id, palette: m?.palette, hueShift: m?.hueShift, seatId: m?.seatId, folderName: folderNames[id], name: m?.name })
         }
         setAgents((prev) => {
           const ids = new Set(prev)
