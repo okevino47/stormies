@@ -26,6 +26,14 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <b>1.1.0</b>
+        <ul>
+            <li>Thinking thought bubbles — cloud-style bubbles show what Claude is pondering during its reasoning phase</li>
+            <li>Activity animation templates — dedicated animations for each tool type</li>
+            <li>UI visibility toggle — eye icon to hide/show all overlays</li>
+            <li>Project-scoped agent detection — each IDE window only shows its own project's agents</li>
+            <li>Improved plugin JAR loading with fallback strategies</li>
+        </ul>
         <b>1.0.1</b>
         <ul>
             <li>Fixed plugin loading issue after install</li>
