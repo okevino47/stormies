@@ -370,11 +370,94 @@ function placeWorkstation(
   return false
 }
 
+/** Scatter small surface items (laptops, phones, etc.) onto desk tiles. */
+function placeSurfaceItems(
+  rect: Rect, placed: PlacedFurniture[], coverage: number,
+): void {
+  const deskTiles: Pos[] = []
+  for (const item of placed) {
+    const entry = getCatalogEntry(item.type)
+    if (!entry || !entry.isDesk) continue
+    if (item.col < rect.x || item.col >= rect.x + rect.w) continue
+    if (item.row < rect.y || item.row >= rect.y + rect.h) continue
+    for (let dr = 0; dr < entry.footprintH; dr++) {
+      for (let dc = 0; dc < entry.footprintW; dc++) {
+        deskTiles.push({ col: item.col + dc, row: item.row + dr })
+      }
+    }
+  }
+  if (deskTiles.length === 0) return
+  const surfaceTypes = getActiveCatalog().filter(e => e.canPlaceOnSurfaces && e.footprintW === 1 && e.footprintH === 1)
+  if (surfaceTypes.length === 0) return
+  for (const tile of shuffle(deskTiles)) {
+    if (Math.random() > coverage) continue
+    const entry = randChoice(surfaceTypes)
+    placed.push({ uid: makeUid(), type: entry.type, col: tile.col, row: tile.row })
+  }
+}
+
+/** Post-processing: fill empty corners and wall-adjacent tiles with small items. */
+function fillGaps(
+  rooms: Rect[], tiles: TileTypeVal[], cols: number,
+  existingFurniture: PlacedFurniture[],
+): PlacedFurniture[] {
+  const items: PlacedFurniture[] = []
+  const occupied = new Set<string>()
+  for (const f of existingFurniture) {
+    const ft = fp(f.type)
+    if (!ft) continue
+    for (let dr = 0; dr < ft.h; dr++) {
+      for (let dc = 0; dc < ft.w; dc++) {
+        occupied.add(`${f.col + dc},${f.row + dr}`)
+      }
+    }
+  }
+  const fillerTypes = getActiveCatalog().filter(
+    e => e.footprintW === 1 && e.footprintH === 1 && !e.canPlaceOnWalls && !e.canPlaceOnSurfaces &&
+      ['plants', 'decor', 'misc'].includes(e.category)
+  )
+  if (fillerTypes.length === 0) return items
+  for (const room of rooms) {
+    const corners: Pos[] = [
+      { col: room.x, row: room.y },
+      { col: room.x + room.w - 1, row: room.y },
+      { col: room.x, row: room.y + room.h - 1 },
+      { col: room.x + room.w - 1, row: room.y + room.h - 1 },
+    ]
+    for (const corner of corners) {
+      if (Math.random() > 0.7) continue
+      const key = `${corner.col},${corner.row}`
+      if (occupied.has(key)) continue
+      const idx = corner.row * cols + corner.col
+      if (tiles[idx] === TileType.WALL) continue
+      const entry = randChoice(fillerTypes)
+      items.push({ uid: makeUid(), type: entry.type, col: corner.col, row: corner.row })
+      occupied.add(key)
+    }
+    for (let c = room.x; c < room.x + room.w; c++) {
+      for (let r = room.y; r < room.y + room.h; r++) {
+        const key = `${c},${r}`
+        if (occupied.has(key)) continue
+        const idx = r * cols + c
+        if (tiles[idx] === TileType.WALL) continue
+        const isWallAdjacent =
+          (c === room.x || c === room.x + room.w - 1 || r === room.y || r === room.y + room.h - 1)
+        if (!isWallAdjacent) continue
+        if (Math.random() > 0.25) continue
+        const entry = randChoice(fillerTypes)
+        items.push({ uid: makeUid(), type: entry.type, col: c, row: r })
+        occupied.add(key)
+      }
+    }
+  }
+  return items
+}
+
 // ── Per-room-type placement ──────────────────────────────────
 
 function placeWorkspaceRoom(rect: Rect, occupied: Set<string>, placed: PlacedFurniture[]): void {
   const area = rect.w * rect.h
-  const numWorkstations = Math.max(1, Math.floor(area / 25))
+  const numWorkstations = Math.max(2, Math.floor(area / 8))
 
   const deskType = pickType({ categories: ['desks'], isDesk: true, maxW: rect.w, maxH: rect.h }) ?? FurnitureType.DESK
   const chairType = pickType({ categories: ['chairs'], maxW: 1, maxH: 1 }) ?? FurnitureType.CHAIR
@@ -384,31 +467,50 @@ function placeWorkspaceRoom(rect: Rect, occupied: Set<string>, placed: PlacedFur
     placeWorkstation(rect, occupied, placed, deskType, chairType, pcType)
   }
 
-  const accentType = pickType({ categories: ['plants', 'decor'], maxW: 1, maxH: 1 }) ?? FurnitureType.PLANT
-  if (Math.random() < 0.5) placeInCorner(rect, occupied, accentType, placed)
+  // Printers/filing cabinets along walls
+  const numWallItems = randInt(1, 2)
+  for (let i = 0; i < numWallItems; i++) {
+    const type = Math.random() < 0.5
+      ? (pickType({ categories: ['electronics'], maxW: 1, maxH: 1 }) ?? FurnitureType.PRINTER)
+      : (pickType({ categories: ['storage'], maxW: 1, maxH: 1 }) ?? FurnitureType.FILING_CABINET)
+    placeAlongAnyWall(rect, occupied, type, placed)
+  }
 
-  const elecType = pickType({ categories: ['electronics'], maxW: 1, maxH: 1 }) ?? FurnitureType.LAMP
-  if (Math.random() < 0.3) placeInCorner(rect, occupied, elecType, placed)
+  // Plants in corners
+  const numPlants = randInt(1, 2)
+  for (let i = 0; i < numPlants; i++) {
+    const plantType = pickType({ categories: ['plants', 'decor'], maxW: 1 }) ?? FurnitureType.PLANT
+    placeInCorner(rect, occupied, plantType, placed)
+  }
+
+  // Trash can
+  const trashType = pickType({ categories: ['misc'], maxW: 1, maxH: 1 }) ?? FurnitureType.COOLER
+  placeAlongAnyWall(rect, occupied, trashType, placed)
+
+  placeSurfaceItems(rect, placed, 0.4)
 }
 
 function placeMeetingRoom(rect: Rect, occupied: Set<string>, placed: PlacedFurniture[]): void {
+  // Rug under meeting area (40%)
+  if (Math.random() < 0.4) {
+    const rugType = pickType({ categories: ['decor'], backgroundTiles: true, maxW: rect.w, maxH: rect.h }) ?? FurnitureType.RUG
+    placeCentered(rect, occupied, rugType, placed)
+  }
+
+  // Conference table centered (always)
   const tableType = pickType({ categories: ['desks'], maxW: rect.w, maxH: rect.h }) ?? FurnitureType.DESK
   const chairType = pickType({ categories: ['chairs'], maxW: 1, maxH: 1 }) ?? FurnitureType.CHAIR
 
-  // Center table with chairs around all sides
   const deskPos = placeCentered(rect, occupied, tableType, placed)
   if (deskPos) {
     const deskFt = fp(tableType)
     if (deskFt) {
-      const numChairs = randInt(3, 6)
+      // Chairs on ALL sides (up to 6)
+      const numChairs = Math.min(6, 2 * (deskFt.w + deskFt.h))
       const chairSpots: Pos[] = []
-      // Bottom edge
       for (let dc = 0; dc < deskFt.w; dc++) chairSpots.push({ col: deskPos.col + dc, row: deskPos.row + deskFt.h })
-      // Top edge
       for (let dc = 0; dc < deskFt.w; dc++) chairSpots.push({ col: deskPos.col + dc, row: deskPos.row - 1 })
-      // Left edge
       for (let dr = 0; dr < deskFt.h; dr++) chairSpots.push({ col: deskPos.col - 1, row: deskPos.row + dr })
-      // Right edge
       for (let dr = 0; dr < deskFt.h; dr++) chairSpots.push({ col: deskPos.col + deskFt.w, row: deskPos.row + dr })
 
       let chairsPlaced = 0
@@ -421,158 +523,288 @@ function placeMeetingRoom(rect: Rect, occupied: Set<string>, placed: PlacedFurni
     }
   }
 
-  // Wall feature (whiteboard, decor, etc.) on top wall
+  // ALWAYS whiteboard or mounted-tv on top wall
   const wallFeatureType = pickType({ categories: ['decor'], maxW: 2, maxH: 1 }) ?? FurnitureType.WHITEBOARD
-  if (Math.random() < 0.7) {
-    placeAlongWall(rect, occupied, wallFeatureType, 'top', placed)
+  const featurePos = placeAlongWall(rect, occupied, wallFeatureType, 'top', placed)
+
+  // Projector/electronics near wall feature
+  if (featurePos) {
+    const projType = pickType({ categories: ['electronics'], maxW: 1, maxH: 1 }) ?? FurnitureType.PC
+    placeNear(rect, occupied, projType, featurePos.col, featurePos.row + 1, 2, placed)
   }
+
+  // Plants in corners
+  for (let i = 0; i < 2; i++) {
+    const plantType = pickType({ categories: ['plants', 'decor'], maxW: 1 }) ?? FurnitureType.PLANT
+    placeInCorner(rect, occupied, plantType, placed)
+  }
+
+  placeSurfaceItems(rect, placed, 0.3)
 }
 
 function placeKitchenRoom(rect: Rect, occupied: Set<string>, placed: PlacedFurniture[]): void {
-  const applianceType1 = pickType({ categories: ['misc'], maxW: 1, maxH: 1 }) ?? FurnitureType.COFFEE_MACHINE
-  const applianceType2 = pickType({ categories: ['misc'], maxW: 1, maxH: 1 }) ?? FurnitureType.COOLER
-  const seatingType = pickType({ categories: ['chairs'], maxW: 2 }) ?? FurnitureType.COUCH
+  // Appliance wall — group fridge, counter, coffee-machine along one wall
+  const applianceWall = randChoice<Wall>(['top', 'left', 'right'])
+  const fridgeType = pickType({ categories: ['misc'], maxW: 1, maxH: 1 }) ?? FurnitureType.COOLER
+  const counterType = pickType({ categories: ['desks'], maxW: 1, maxH: 1 }) ?? FurnitureType.COFFEE_TABLE
+  const coffeeType = pickType({ categories: ['misc'], maxW: 1, maxH: 1 }) ?? FurnitureType.COFFEE_MACHINE
+
+  const fridgePos = placeAlongWall(rect, occupied, fridgeType, applianceWall, placed)
+  if (fridgePos) {
+    placeNear(rect, occupied, counterType, fridgePos.col + 1, fridgePos.row, 2, placed)
+    placeNear(rect, occupied, coffeeType, fridgePos.col + 2, fridgePos.row, 2, placed)
+  } else {
+    placeAlongAnyWall(rect, occupied, fridgeType, placed)
+    placeAlongAnyWall(rect, occupied, counterType, placed)
+    placeAlongAnyWall(rect, occupied, coffeeType, placed)
+  }
+
+  // Trash can nearby
+  const trashType = pickType({ categories: ['misc'], maxW: 1, maxH: 1 }) ?? FurnitureType.COOLER
+  if (fridgePos) {
+    placeNear(rect, occupied, trashType, fridgePos.col, fridgePos.row + 1, 3, placed)
+  } else {
+    placeAlongAnyWall(rect, occupied, trashType, placed)
+  }
+
+  // Eating area — table + chairs
   const tableType = pickType({ categories: ['desks'], maxW: 1, maxH: 1 }) ?? FurnitureType.COFFEE_TABLE
-
-  // Appliances along walls
-  placeAlongAnyWall(rect, occupied, applianceType1, placed)
-  placeAlongAnyWall(rect, occupied, applianceType2, placed)
-
-  // Optional seating + table nearby
-  if (Math.random() < 0.6) {
-    const seatPos = placeAlongWall(rect, occupied, seatingType, 'bottom', placed)
-      ?? placeAlongAnyWall(rect, occupied, seatingType, placed)
-    if (seatPos) {
-      placeNear(rect, occupied, tableType, seatPos.col, seatPos.row - 1, 2, placed)
+  const chairType = pickType({ categories: ['chairs'], maxW: 1, maxH: 1 }) ?? FurnitureType.CHAIR
+  const tablePos = placeCentered(rect, occupied, tableType, placed)
+  if (tablePos) {
+    const numChairs = randInt(2, 4)
+    const spots: Pos[] = [
+      { col: tablePos.col + 1, row: tablePos.row },
+      { col: tablePos.col - 1, row: tablePos.row },
+      { col: tablePos.col, row: tablePos.row + 1 },
+      { col: tablePos.col, row: tablePos.row - 1 },
+    ]
+    let seatsPlaced = 0
+    for (const spot of shuffle(spots)) {
+      if (seatsPlaced >= numChairs) break
+      if (tryPlaceAt(spot.col, spot.row, chairType, rect, occupied, placed)) seatsPlaced++
     }
   }
 
-  // 1–2 tables in center area
-  const numTables = randInt(1, 2)
-  for (let i = 0; i < numTables; i++) {
-    placeCentered(rect, occupied, tableType, placed)
+  // Extras
+  if (Math.random() < 0.5) {
+    const vendType = pickType({ categories: ['misc'], maxW: 1 }) ?? FurnitureType.COOLER
+    placeAlongAnyWall(rect, occupied, vendType, placed)
   }
+  const coolerType = pickType({ categories: ['misc'], maxW: 1, maxH: 1 }) ?? FurnitureType.COOLER
+  placeAlongAnyWall(rect, occupied, coolerType, placed)
+
+  // Plant in corner
+  const plantType = pickType({ categories: ['plants', 'decor'], maxW: 1 }) ?? FurnitureType.PLANT
+  placeInCorner(rect, occupied, plantType, placed)
+
+  placeSurfaceItems(rect, placed, 0.3)
 }
 
 function placeLibraryRoom(rect: Rect, occupied: Set<string>, placed: PlacedFurniture[]): void {
   const shelvingType = pickType({ categories: ['storage'], maxH: rect.h }) ?? FurnitureType.BOOKSHELF
   const chairType = pickType({ categories: ['chairs'], maxW: 1, maxH: 1 }) ?? FurnitureType.CHAIR
-  const accentType = pickType({ categories: ['decor', 'plants'], maxW: 1, maxH: 1 }) ?? FurnitureType.PLANT
+  const lampType = pickType({ categories: ['decor'], maxW: 1, maxH: 1 }) ?? FurnitureType.LAMP
+  const tableType = pickType({ categories: ['desks'], maxW: 1, maxH: 1 }) ?? FurnitureType.COFFEE_TABLE
 
-  // Shelving lining walls
+  // Shelving lining 2-3 walls (denser: perimeter/3)
   const wallLength = 2 * (rect.w + rect.h)
-  const numShelves = Math.max(2, Math.floor(wallLength / 4))
-  const walls = shuffle<Wall>(['top', 'left', 'right', 'bottom'])
+  const numShelves = Math.max(3, Math.floor(wallLength / 3))
+  const walls = shuffle<Wall>(['top', 'left', 'right'])
   for (let i = 0; i < numShelves; i++) {
     placeAlongWall(rect, occupied, shelvingType, walls[i % walls.length], placed)
   }
 
-  // Reading chair in open space with lamp nearby
-  const chairPos = placeRandom(rect, occupied, chairType, placed)
-  if (chairPos && Math.random() < 0.7) {
-    const lampType = pickType({ categories: ['decor'], maxW: 1, maxH: 1 }) ?? FurnitureType.LAMP
-    placeNear(rect, occupied, lampType, chairPos.col, chairPos.row, 2, placed)
-  }
-
-  if (Math.random() < 0.6) placeInCorner(rect, occupied, accentType, placed)
-}
-
-function placeStorageRoom(rect: Rect, occupied: Set<string>, placed: PlacedFurniture[]): void {
-  const storageType = pickType({ categories: ['storage'], maxW: 1 }) ?? FurnitureType.FILING_CABINET
-  const shelfType = pickType({ categories: ['storage'] }) ?? FurnitureType.BOOKSHELF
-  const elecType = pickType({ categories: ['electronics'], maxW: 1, maxH: 1 }) ?? FurnitureType.PRINTER
-
-  // Storage units along walls (scales with perimeter)
-  const perimeter = 2 * (rect.w + rect.h)
-  const numCabinets = Math.max(2, Math.floor(perimeter / 6))
-  const walls = shuffle<Wall>(['left', 'right', 'top', 'bottom'])
-  for (let i = 0; i < numCabinets; i++) {
-    placeAlongWall(rect, occupied, storageType, walls[i % walls.length], placed)
-  }
-
-  // Shelves along remaining wall space
-  const numShelves = randInt(0, 2)
-  for (let i = 0; i < numShelves; i++) {
-    placeAlongAnyWall(rect, occupied, shelfType, placed)
-  }
-
-  // Electronics along wall
+  // Rug under reading area (60%)
   if (Math.random() < 0.6) {
-    placeAlongAnyWall(rect, occupied, elecType, placed)
+    const rugType = pickType({ categories: ['decor'], backgroundTiles: true, maxW: rect.w, maxH: rect.h }) ?? FurnitureType.RUG
+    placeCentered(rect, occupied, rugType, placed)
   }
-}
 
-function placeLoungeRoom(rect: Rect, occupied: Set<string>, placed: PlacedFurniture[]): void {
-  const rugType = pickType({ categories: ['decor'], backgroundTiles: true, maxW: rect.w, maxH: rect.h }) ?? FurnitureType.RUG
-  const seatingType = pickType({ categories: ['chairs'], maxW: 3 }) ?? FurnitureType.COUCH
-  const tableType = pickType({ categories: ['desks'], maxW: 1, maxH: 1 }) ?? FurnitureType.COFFEE_TABLE
-  const treeType = pickType({ categories: ['plants'] })
-    ?? pickType({ categories: ['decor'], maxW: 1, maxH: 2 })
-    ?? FurnitureType.POTTED_TREE
-  const plantType = pickType({ categories: ['plants'] })
-    ?? pickType({ categories: ['decor'], maxW: 1, maxH: 1 })
-    ?? FurnitureType.PLANT
-
-  // Rug centered
-  if (Math.random() < 0.6) placeCentered(rect, occupied, rugType, placed)
-
-  // Seating along walls with tables nearby
-  const numSeats = randInt(1, 2)
-  for (let i = 0; i < numSeats; i++) {
-    const seatPos = placeAlongAnyWall(rect, occupied, seatingType, placed)
-    if (seatPos) {
-      placeNear(rect, occupied, tableType, seatPos.col, seatPos.row, 2, placed)
+  // 2-3 reading chairs with lamps nearby
+  const numChairs = randInt(2, 3)
+  for (let i = 0; i < numChairs; i++) {
+    const chairPos = placeRandom(rect, occupied, chairType, placed)
+    if (chairPos) {
+      placeNear(rect, occupied, lampType, chairPos.col + 1, chairPos.row, 2, placed)
     }
   }
 
-  // Corner trees and plants
-  if (Math.random() < 0.5) placeInCorner(rect, occupied, treeType, placed)
-  const numPlants = randInt(0, 2)
-  for (let i = 0; i < numPlants; i++) {
-    placeInCorner(rect, occupied, plantType, placed)
+  // Small table near chairs
+  placeRandom(rect, occupied, tableType, placed)
+
+  // Accent pieces
+  const accentType = pickType({ categories: ['decor', 'plants'], maxW: 1, maxH: 1 }) ?? FurnitureType.PLANT
+  placeInCorner(rect, occupied, accentType, placed)
+  if (Math.random() < 0.5) {
+    const accent2 = pickType({ categories: ['decor'], maxW: 1, maxH: 1 }) ?? FurnitureType.LAMP
+    placeInCorner(rect, occupied, accent2, placed)
   }
+
+  placeSurfaceItems(rect, placed, 0.3)
+}
+
+function placeStorageRoom(rect: Rect, occupied: Set<string>, placed: PlacedFurniture[]): void {
+  // Storage units along walls (denser: perimeter/4, mixed types)
+  const perimeter = 2 * (rect.w + rect.h)
+  const numCabinets = Math.max(3, Math.floor(perimeter / 4))
+  const walls = shuffle<Wall>(['left', 'right', 'top', 'bottom'])
+  for (let i = 0; i < numCabinets; i++) {
+    const storageType = Math.random() < 0.5
+      ? (pickType({ categories: ['storage'], maxW: 1 }) ?? FurnitureType.FILING_CABINET)
+      : (pickType({ categories: ['storage'] }) ?? FurnitureType.BOOKSHELF)
+    placeAlongWall(rect, occupied, storageType, walls[i % walls.length], placed)
+  }
+
+  // Server rack (30% chance)
+  if (Math.random() < 0.3) {
+    const serverType = pickType({ categories: ['electronics'], maxW: 1 }) ?? FurnitureType.PC
+    placeAlongAnyWall(rect, occupied, serverType, placed)
+  }
+
+  // Printer area
+  const printerType = pickType({ categories: ['electronics'], maxW: 1, maxH: 1 }) ?? FurnitureType.PRINTER
+  placeAlongAnyWall(rect, occupied, printerType, placed)
+
+  // Fire extinguisher / misc in corner
+  const miscType = pickType({ categories: ['misc', 'decor'], maxW: 1, maxH: 1 }) ?? FurnitureType.COOLER
+  placeInCorner(rect, occupied, miscType, placed)
+}
+
+function placeLoungeRoom(rect: Rect, occupied: Set<string>, placed: PlacedFurniture[]): void {
+  // ALWAYS rug centered
+  const rugType = pickType({ categories: ['decor'], backgroundTiles: true, maxW: rect.w, maxH: rect.h }) ?? FurnitureType.RUG
+  placeCentered(rect, occupied, rugType, placed)
+
+  // Entertainment zone: TV on top wall
+  const tvType = pickType({ categories: ['electronics', 'decor'], maxW: 2, maxH: 1 }) ?? FurnitureType.WHITEBOARD
+  const tvPos = placeAlongWall(rect, occupied, tvType, 'top', placed)
+
+  // Sofa facing TV, 2-3 tiles away
+  const sofaType = pickType({ categories: ['chairs'], maxW: 3 }) ?? FurnitureType.COUCH
+  let sofaPos: Pos | null = null
+  if (tvPos) {
+    sofaPos = placeNear(rect, occupied, sofaType, tvPos.col, tvPos.row + randInt(2, 3), 3, placed)
+  }
+  if (!sofaPos) {
+    sofaPos = placeAlongWall(rect, occupied, sofaType, 'bottom', placed)
+      ?? placeAlongAnyWall(rect, occupied, sofaType, placed)
+  }
+
+  // Coffee table between TV and sofa
+  const tableType = pickType({ categories: ['desks'], maxW: 1, maxH: 1 }) ?? FurnitureType.COFFEE_TABLE
+  if (sofaPos && tvPos) {
+    const midRow = Math.floor((tvPos.row + sofaPos.row) / 2)
+    placeNear(rect, occupied, tableType, sofaPos.col, midRow, 2, placed)
+  } else if (sofaPos) {
+    placeNear(rect, occupied, tableType, sofaPos.col, sofaPos.row - 1, 2, placed)
+  }
+
+  // 1-2 armchairs/bean-bags flanking sofa
+  const chairType = pickType({ categories: ['chairs'], maxW: 1, maxH: 1 }) ?? FurnitureType.CHAIR
+  const numChairs = randInt(1, 2)
+  if (sofaPos) {
+    for (let i = 0; i < numChairs; i++) {
+      placeNear(rect, occupied, chairType, sofaPos.col + (i === 0 ? -1 : 2), sofaPos.row, 2, placed)
+    }
+  }
+
+  // Lamp near seating
+  const lampType = pickType({ categories: ['decor'], maxW: 1, maxH: 1 }) ?? FurnitureType.LAMP
+  if (sofaPos) {
+    placeNear(rect, occupied, lampType, sofaPos.col - 1, sofaPos.row, 3, placed)
+  } else {
+    placeInCorner(rect, occupied, lampType, placed)
+  }
+
+  // 2-3 plants (potted tree in corner, smaller plants elsewhere)
+  const numPlants = randInt(2, 3)
+  for (let i = 0; i < numPlants; i++) {
+    const pType = i === 0
+      ? (pickType({ categories: ['plants', 'decor'], maxW: 1, maxH: 2 }) ?? FurnitureType.POTTED_TREE)
+      : (pickType({ categories: ['plants', 'decor'], maxW: 1, maxH: 1 }) ?? FurnitureType.PLANT)
+    placeInCorner(rect, occupied, pType, placed)
+  }
+
+  // Extras: bookshelf (50%), arcade (20%)
+  if (Math.random() < 0.5) {
+    const shelfType = pickType({ categories: ['storage'] }) ?? FurnitureType.BOOKSHELF
+    placeAlongAnyWall(rect, occupied, shelfType, placed)
+  }
+  if (Math.random() < 0.2) {
+    const arcadeType = pickType({ categories: ['electronics', 'misc'], maxW: 1 }) ?? FurnitureType.PC
+    placeAlongAnyWall(rect, occupied, arcadeType, placed)
+  }
+
+  placeSurfaceItems(rect, placed, 0.2)
 }
 
 function placeManagerRoom(rect: Rect, occupied: Set<string>, placed: PlacedFurniture[]): void {
   const deskType = pickType({ categories: ['desks'], isDesk: true, maxW: rect.w, maxH: rect.h }) ?? FurnitureType.DESK
   const chairType = pickType({ categories: ['chairs'], maxW: 1, maxH: 1 }) ?? FurnitureType.CHAIR
-  const shelfType = pickType({ categories: ['storage'] }) ?? FurnitureType.BOOKSHELF
-  const accentType = pickType({ categories: ['plants', 'decor'], maxW: 1, maxH: 1 }) ?? FurnitureType.PLANT
 
   const deskFt = fp(deskType)
   if (!deskFt) return
 
-  // Desk in back half (toward top wall, centered horizontally)
+  // Rug under desk area (40%)
+  if (Math.random() < 0.4) {
+    const rugType = pickType({ categories: ['decor'], backgroundTiles: true, maxW: rect.w, maxH: rect.h }) ?? FurnitureType.RUG
+    placeCentered(rect, occupied, rugType, placed)
+  }
+
+  // Desk in back third (toward top wall, centered horizontally)
   const backRow = rect.y + Math.max(0, Math.floor((rect.h - deskFt.h) / 3))
   const centerCol = rect.x + Math.floor((rect.w - deskFt.w) / 2)
   const deskPos = placeNear(rect, occupied, deskType, centerCol, backRow, Math.max(rect.w, rect.h), placed)
 
   if (deskPos) {
-    // Chairs in front of desk (footprint-adaptive)
-    const numChairs = randInt(1, 2)
-    const chairSpots: Pos[] = []
-    for (let dc = 0; dc < deskFt.w; dc++) chairSpots.push({ col: deskPos.col + dc, row: deskPos.row + deskFt.h })
-    chairSpots.push({ col: deskPos.col - 1, row: deskPos.row + deskFt.h - 1 })
-    chairSpots.push({ col: deskPos.col + deskFt.w, row: deskPos.row + deskFt.h - 1 })
+    // Executive chair behind desk (toward top wall)
+    const behindPos = tryPlaceAt(deskPos.col, deskPos.row - 1, chairType, rect, occupied, placed)
+    if (!behindPos) placeNear(rect, occupied, chairType, deskPos.col, deskPos.row - 1, 2, placed)
+
+    // 2 visitor chairs in front of desk
+    const visitorSpots: Pos[] = []
+    for (let dc = 0; dc < deskFt.w; dc++) visitorSpots.push({ col: deskPos.col + dc, row: deskPos.row + deskFt.h })
+    visitorSpots.push({ col: deskPos.col - 1, row: deskPos.row + deskFt.h })
+    visitorSpots.push({ col: deskPos.col + deskFt.w, row: deskPos.row + deskFt.h })
 
     let chairsPlaced = 0
-    for (const spot of shuffle(chairSpots)) {
-      if (chairsPlaced >= numChairs) break
+    for (const spot of shuffle(visitorSpots)) {
+      if (chairsPlaced >= 2) break
       if (tryPlaceAt(spot.col, spot.row, chairType, rect, occupied, placed)) {
         chairsPlaced++
       }
     }
-  }
 
-  // Shelf along wall
-  if (Math.random() < 0.6) placeAlongAnyWall(rect, occupied, shelfType, placed)
+    // PC near desk
+    const pcType = pickType({ categories: ['electronics'], maxW: 1, maxH: 1 }) ?? FurnitureType.PC
+    placeNear(rect, occupied, pcType, deskPos.col + deskFt.w, deskPos.row, 2, placed)
 
-  // Corner accent + lamp
-  if (Math.random() < 0.6) placeInCorner(rect, occupied, accentType, placed)
-  if (Math.random() < 0.5) {
+    // Lamp near desk
     const lampType = pickType({ categories: ['decor'], maxW: 1, maxH: 1 }) ?? FurnitureType.LAMP
-    placeInCorner(rect, occupied, lampType, placed)
+    placeNear(rect, occupied, lampType, deskPos.col - 1, deskPos.row, 3, placed)
   }
+
+  // Bookshelf + filing cabinet along side wall
+  const shelfType = pickType({ categories: ['storage'] }) ?? FurnitureType.BOOKSHELF
+  placeAlongWall(rect, occupied, shelfType, Math.random() < 0.5 ? 'left' : 'right', placed)
+  const cabinetType = pickType({ categories: ['storage'], maxW: 1, maxH: 1 }) ?? FurnitureType.FILING_CABINET
+  placeAlongAnyWall(rect, occupied, cabinetType, placed)
+
+  // Potted tree in 1-2 corners
+  const numTrees = randInt(1, 2)
+  for (let i = 0; i < numTrees; i++) {
+    const treeType = pickType({ categories: ['plants', 'decor'], maxW: 1 }) ?? FurnitureType.POTTED_TREE
+    placeInCorner(rect, occupied, treeType, placed)
+  }
+
+  // Wall art
+  if (Math.random() < 0.5) {
+    const artType = pickType({ categories: ['decor'], maxW: 1, maxH: 1 }) ?? FurnitureType.PLANT
+    placeAlongWall(rect, occupied, artType, 'top', placed)
+  }
+
+  placeSurfaceItems(rect, placed, 0.5)
 }
 
 // ── Main room placement dispatcher ───────────────────────────
@@ -596,15 +828,18 @@ function placeFurnitureInRoom(rect: Rect, roomType: RoomType): PlacedFurniture[]
 
 /**
  * Place wall-mountable items on wall tiles adjacent to room interiors.
+ * Processes every room's top wall plus left/right walls for 1-wide items.
  */
 function placeWallItems(
   rooms: Rect[],
   tiles: TileTypeVal[],
   cols: number,
   existingFurniture: PlacedFurniture[],
+  _roomTypes: RoomType[],
 ): PlacedFurniture[] {
   const items: PlacedFurniture[] = []
   const usedWalls = new Set<string>()
+  const totalRows = Math.floor(tiles.length / cols)
 
   // Mark existing furniture positions
   for (const f of existingFurniture) {
@@ -617,47 +852,74 @@ function placeWallItems(
     }
   }
 
-  // Collect all wall-placeable item types from the active catalog
   const wallTypes = getActiveCatalog().filter(e => e.canPlaceOnWalls)
   if (wallTypes.length === 0) return items
 
-  // For each room, consider top wall for wall-mounted items
-  for (const room of rooms) {
-    if (Math.random() > 0.5) continue // ~50% chance per room
-
-    const numToPlace = randInt(1, 2)
-    const wallRow = room.y - 1
-    if (wallRow < 0) continue
-
-    for (let n = 0; n < numToPlace; n++) {
+  const placeOnWallRow = (wallRow: number, startCol: number, endCol: number, maxItems: number) => {
+    if (wallRow < 0 || wallRow >= totalRows) return
+    for (let n = 0; n < maxItems; n++) {
       const entry = randChoice(wallTypes)
       const ft = fp(entry.type)
       if (!ft) continue
-
-      // Find valid placement along top wall
-      const maxStartCol = room.x + room.w - ft.w
-      if (maxStartCol < room.x) continue
-      const startCols = shuffle(Array.from({ length: maxStartCol - room.x + 1 }, (_, i) => room.x + i))
-
+      const maxStartCol = endCol - ft.w
+      if (maxStartCol < startCol) continue
+      const startCols = shuffle(Array.from({ length: maxStartCol - startCol + 1 }, (_, i) => startCol + i))
       for (const col of startCols) {
-        // Check all tiles in the footprint are wall tiles and not used
         let valid = true
         for (let dc = 0; dc < ft.w; dc++) {
           const c = col + dc
           const idx = wallRow * cols + c
-          if (tiles[idx] !== TileType.WALL || usedWalls.has(`${c},${wallRow}`)) {
+          if (idx < 0 || idx >= tiles.length || tiles[idx] !== TileType.WALL || usedWalls.has(`${c},${wallRow}`)) {
             valid = false
             break
           }
         }
         if (!valid) continue
-
-        const uid = `wi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
-        items.push({ uid, type: entry.type, col, row: wallRow })
+        items.push({ uid: `wi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, type: entry.type, col, row: wallRow })
         for (let dc = 0; dc < ft.w; dc++) {
           usedWalls.add(`${col + dc},${wallRow}`)
         }
         break
+      }
+    }
+  }
+
+  const oneWideWallTypes = wallTypes.filter(e => (fp(e.type)?.w ?? 0) === 1)
+
+  // Process every room (no skip chance)
+  for (const room of rooms) {
+    // Top wall — higher density: max(2, floor(wallLength / 3))
+    const topWallRow = room.y - 1
+    const numTopItems = Math.max(2, Math.floor(room.w / 3))
+    placeOnWallRow(topWallRow, room.x, room.x + room.w, numTopItems)
+
+    // Left wall with 1-wide items
+    if (oneWideWallTypes.length > 0) {
+      const leftWallCol = room.x - 1
+      if (leftWallCol >= 0) {
+        for (let r = room.y; r < room.y + room.h; r++) {
+          if (Math.random() > 0.3) continue
+          const idx = r * cols + leftWallCol
+          if (idx < 0 || idx >= tiles.length || tiles[idx] !== TileType.WALL) continue
+          if (usedWalls.has(`${leftWallCol},${r}`)) continue
+          const entry = randChoice(oneWideWallTypes)
+          items.push({ uid: `wi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, type: entry.type, col: leftWallCol, row: r })
+          usedWalls.add(`${leftWallCol},${r}`)
+        }
+      }
+
+      // Right wall with 1-wide items
+      const rightWallCol = room.x + room.w
+      if (rightWallCol < cols) {
+        for (let r = room.y; r < room.y + room.h; r++) {
+          if (Math.random() > 0.3) continue
+          const idx = r * cols + rightWallCol
+          if (idx < 0 || idx >= tiles.length || tiles[idx] !== TileType.WALL) continue
+          if (usedWalls.has(`${rightWallCol},${r}`)) continue
+          const entry = randChoice(oneWideWallTypes)
+          items.push({ uid: `wi-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, type: entry.type, col: rightWallCol, row: r })
+          usedWalls.add(`${rightWallCol},${r}`)
+        }
       }
     }
   }
@@ -822,8 +1084,12 @@ export function generateRandomLayout(width: number, height: number, numRooms: nu
   }
 
   // Step 8: Place wall items
-  const wallItems = placeWallItems(rooms, tiles, cols, allFurniture)
+  const wallItems = placeWallItems(rooms, tiles, cols, allFurniture, roomTypes)
   allFurniture = allFurniture.concat(wallItems)
+
+  // Step 9: Fill gaps — post-processing pass for small filler items
+  const gapItems = fillGaps(rooms, tiles, cols, allFurniture)
+  allFurniture = allFurniture.concat(gapItems)
 
   return {
     version: 1,
