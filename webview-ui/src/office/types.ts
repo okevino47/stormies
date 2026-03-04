@@ -41,6 +41,20 @@ export const CharacterState = {
 } as const
 export type CharacterState = (typeof CharacterState)[keyof typeof CharacterState]
 
+export const ActivityAnimation = {
+  TYPING: 'typing',
+  READING: 'reading',
+  WRITING: 'writing',
+  SEARCHING: 'searching',
+  BROWSING: 'browsing',
+  THINKING: 'thinking',
+  PHONE: 'phone',
+  PRESENTING: 'presenting',
+  COFFEE: 'coffee',
+  CELEBRATING: 'celebrating',
+} as const
+export type ActivityAnimation = (typeof ActivityAnimation)[keyof typeof ActivityAnimation]
+
 export const Direction = {
   DOWN: 0,
   LEFT: 1,
@@ -196,6 +210,8 @@ export interface Character {
   isSubagent: boolean
   /** Parent agent ID if this is a sub-agent, null otherwise */
   parentAgentId: number | null
+  /** Countdown timer for celebration animation */
+  celebrateTimer: number
   /** Active matrix spawn/despawn effect, or null */
   matrixEffect: 'spawn' | 'despawn' | null
   /** Timer counting up from 0 to MATRIX_EFFECT_DURATION */
@@ -208,6 +224,10 @@ export interface Character {
   name?: string
   /** Pet type index (0-9) if this is a pet sub-agent, undefined for humanoid */
   petType?: number
+  /** Current thought bubble text (from thinking phase), or null */
+  thinkingText: string | null
+  /** Countdown timer for thought bubble auto-dismiss */
+  thinkingTimer: number
 }
 
 export const PET_TYPE_COUNT = 10

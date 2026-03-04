@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import { OfficeState } from './office/engine/officeState.js'
 import { OfficeCanvas } from './office/components/OfficeCanvas.js'
 import { ToolOverlay } from './office/components/ToolOverlay.js'
+import { ThoughtBubble } from './office/components/ThoughtBubble.js'
 import { EditorToolbar } from './office/editor/EditorToolbar.js'
 import { EditorState } from './office/editor/editorState.js'
 import { EditTool } from './office/types.js'
@@ -125,6 +126,7 @@ function App() {
   const { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets, workspaceFolders } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
 
   const [isDebugMode, setIsDebugMode] = useState(false)
+  const [uiVisible, setUiVisible] = useState(true)
 
   const handleToggleDebugMode = useCallback(() => setIsDebugMode((prev) => !prev), [])
 
@@ -214,7 +216,49 @@ function App() {
         onDynamicFitZoom={editor.handleDynamicFitZoom}
       />
 
-      <ZoomControls zoom={editor.zoom} onZoomChange={editor.handleZoomChange} />
+      {/* UI visibility toggle — always visible */}
+      <button
+        onClick={() => setUiVisible((v) => !v)}
+        title={uiVisible ? 'Hide UI' : 'Show UI'}
+        style={{
+          position: 'absolute',
+          top: 8,
+          right: 8,
+          zIndex: 100,
+          width: 24,
+          height: 24,
+          padding: 0,
+          background: uiVisible ? 'transparent' : 'var(--pixel-bg)',
+          color: 'var(--pixel-text)',
+          border: uiVisible ? '1px solid rgba(255,255,255,0.15)' : '2px solid var(--pixel-border)',
+          borderRadius: 0,
+          cursor: 'pointer',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          opacity: uiVisible ? 0.35 : 0.8,
+          transition: 'opacity 0.15s',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.opacity = '1' }}
+        onMouseLeave={(e) => { e.currentTarget.style.opacity = uiVisible ? '0.35' : '0.8' }}
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          {uiVisible ? (
+            <>
+              <circle cx="7" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M1 7 C3 3.5, 11 3.5, 13 7 C11 10.5, 3 10.5, 1 7Z" stroke="currentColor" strokeWidth="1.5" fill="none" />
+            </>
+          ) : (
+            <>
+              <circle cx="7" cy="7" r="2.5" stroke="currentColor" strokeWidth="1.5" />
+              <path d="M1 7 C3 3.5, 11 3.5, 13 7 C11 10.5, 3 10.5, 1 7Z" stroke="currentColor" strokeWidth="1.5" fill="none" />
+              <line x1="2" y1="12" x2="12" y2="2" stroke="currentColor" strokeWidth="1.5" />
+            </>
+          )}
+        </svg>
+      </button>
+
+      {uiVisible && <ZoomControls zoom={editor.zoom} onZoomChange={editor.handleZoomChange} />}
 
       {/* Vignette overlay */}
       <div
@@ -227,20 +271,22 @@ function App() {
         }}
       />
 
-      <BottomToolbar
-        isEditMode={editor.isEditMode}
-        onOpenClaude={editor.handleOpenClaude}
-        onToggleEditMode={editor.handleToggleEditMode}
-        isDebugMode={isDebugMode}
-        onToggleDebugMode={handleToggleDebugMode}
-        workspaceFolders={workspaceFolders}
-      />
+      {uiVisible && (
+        <BottomToolbar
+          isEditMode={editor.isEditMode}
+          onOpenClaude={editor.handleOpenClaude}
+          onToggleEditMode={editor.handleToggleEditMode}
+          isDebugMode={isDebugMode}
+          onToggleDebugMode={handleToggleDebugMode}
+          workspaceFolders={workspaceFolders}
+        />
+      )}
 
-      {editor.isEditMode && editor.isDirty && (
+      {uiVisible && editor.isEditMode && editor.isDirty && (
         <EditActionBar editor={editor} editorState={editorState} />
       )}
 
-      {showRotateHint && (
+      {uiVisible && showRotateHint && (
         <div
           style={{
             position: 'absolute',
@@ -263,7 +309,7 @@ function App() {
         </div>
       )}
 
-      {editor.isEditMode && (() => {
+      {uiVisible && editor.isEditMode && (() => {
         // Compute selected furniture color from current layout
         const selUid = editorState.selectedFurnitureUid
         const selColor = selUid
@@ -292,26 +338,39 @@ function App() {
         )
       })()}
 
-      <ToolOverlay
-        officeState={officeState}
-        agents={agents}
-        agentTools={agentTools}
-        subagentCharacters={subagentCharacters}
-        containerRef={containerRef}
-        zoom={editor.zoom}
-        panRef={editor.panRef}
-        onCloseAgent={handleCloseAgent}
-      />
+      {uiVisible && (
+        <ToolOverlay
+          officeState={officeState}
+          agents={agents}
+          agentTools={agentTools}
+          subagentCharacters={subagentCharacters}
+          containerRef={containerRef}
+          zoom={editor.zoom}
+          panRef={editor.panRef}
+          onCloseAgent={handleCloseAgent}
+        />
+      )}
 
-      <AgentListPanel
-        officeState={officeState}
-        agents={agents}
-        agentTools={agentTools}
-        subagentCharacters={subagentCharacters}
-        onSelectAgent={handleSelectAgent}
-      />
+      {uiVisible && (
+        <ThoughtBubble
+          officeState={officeState}
+          containerRef={containerRef}
+          zoom={editor.zoom}
+          panRef={editor.panRef}
+        />
+      )}
 
-      {isDebugMode && (
+      {uiVisible && (
+        <AgentListPanel
+          officeState={officeState}
+          agents={agents}
+          agentTools={agentTools}
+          subagentCharacters={subagentCharacters}
+          onSelectAgent={handleSelectAgent}
+        />
+      )}
+
+      {uiVisible && isDebugMode && (
         <DebugView
           agents={agents}
           selectedAgent={selectedAgent}

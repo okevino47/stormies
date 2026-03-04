@@ -1,6 +1,7 @@
 import type { Direction, SpriteData, FloorColor } from '../types.js'
 import { Direction as Dir } from '../types.js'
 import { adjustSprite } from '../colorize.js'
+import * as AT from './activityTemplates.js'
 
 // ── Color Palettes ──────────────────────────────────────────────
 const _ = '' // transparent
@@ -618,14 +619,13 @@ interface CharPalette {
 }
 
 // Template keys for character pixel data
-const H = 'hair'
-const K = 'skin'
-const S = 'shirt'
-const P = 'pants'
-const O = 'shoes'
-const E = '#FFFFFF' // eyes
-
-type TemplateCell = typeof H | typeof K | typeof S | typeof P | typeof O | typeof E | typeof _
+export const H = 'hair'
+export const K = 'skin'
+export const S = 'shirt'
+export const P = 'pants'
+export const O = 'shoes'
+export const E = '#FFFFFF' // eyes
+export type TemplateCell = typeof H | typeof K | typeof S | typeof P | typeof O | typeof E | typeof _
 
 /** Resolve a template to SpriteData using a palette */
 function resolveTemplate(template: TemplateCell[][], palette: CharPalette): SpriteData {
@@ -1242,22 +1242,48 @@ const CHAR_RIGHT_READ_2: TemplateCell[][] = [
 // ════════════════════════════════════════════════════════════════
 
 /** All character templates grouped by direction, for use by the export script.
- *  Frame order per direction: walk1, walk2, walk3, type1, type2, read1, read2 */
+ *  Frame order per direction: walk1, walk2, walk3, type1, type2, read1, read2,
+ *  write1, write2, search1, search2, browse1, browse2, think1, think2,
+ *  phone1, phone2, present1, present2, coffee1, coffee2, celebrate1, celebrate2 */
 export const CHARACTER_TEMPLATES = {
   down: [
     CHAR_WALK_DOWN_1, CHAR_WALK_DOWN_2, CHAR_WALK_DOWN_3,
     CHAR_DOWN_TYPE_1, CHAR_DOWN_TYPE_2,
     CHAR_DOWN_READ_1, CHAR_DOWN_READ_2,
+    AT.DOWN_WRITE_1, AT.DOWN_WRITE_2,
+    AT.DOWN_SEARCH_1, AT.DOWN_SEARCH_2,
+    AT.DOWN_BROWSE_1, AT.DOWN_BROWSE_2,
+    AT.DOWN_THINK_1, AT.DOWN_THINK_2,
+    AT.DOWN_PHONE_1, AT.DOWN_PHONE_2,
+    AT.DOWN_PRESENT_1, AT.DOWN_PRESENT_2,
+    AT.DOWN_COFFEE_1, AT.DOWN_COFFEE_2,
+    AT.DOWN_CELEBRATE_1, AT.DOWN_CELEBRATE_2,
   ],
   up: [
     CHAR_WALK_UP_1, CHAR_WALK_UP_2, CHAR_WALK_UP_3,
     CHAR_UP_TYPE_1, CHAR_UP_TYPE_2,
     CHAR_UP_READ_1, CHAR_UP_READ_2,
+    AT.UP_WRITE_1, AT.UP_WRITE_2,
+    AT.UP_SEARCH_1, AT.UP_SEARCH_2,
+    AT.UP_BROWSE_1, AT.UP_BROWSE_2,
+    AT.UP_THINK_1, AT.UP_THINK_2,
+    AT.UP_PHONE_1, AT.UP_PHONE_2,
+    AT.UP_PRESENT_1, AT.UP_PRESENT_2,
+    AT.UP_COFFEE_1, AT.UP_COFFEE_2,
+    AT.UP_CELEBRATE_1, AT.UP_CELEBRATE_2,
   ],
   right: [
     CHAR_WALK_RIGHT_1, CHAR_WALK_RIGHT_2, CHAR_WALK_RIGHT_3,
     CHAR_RIGHT_TYPE_1, CHAR_RIGHT_TYPE_2,
     CHAR_RIGHT_READ_1, CHAR_RIGHT_READ_2,
+    AT.RIGHT_WRITE_1, AT.RIGHT_WRITE_2,
+    AT.RIGHT_SEARCH_1, AT.RIGHT_SEARCH_2,
+    AT.RIGHT_BROWSE_1, AT.RIGHT_BROWSE_2,
+    AT.RIGHT_THINK_1, AT.RIGHT_THINK_2,
+    AT.RIGHT_PHONE_1, AT.RIGHT_PHONE_2,
+    AT.RIGHT_PRESENT_1, AT.RIGHT_PRESENT_2,
+    AT.RIGHT_COFFEE_1, AT.RIGHT_COFFEE_2,
+    AT.RIGHT_CELEBRATE_1, AT.RIGHT_CELEBRATE_2,
   ],
 } as const
 
@@ -1293,6 +1319,14 @@ export interface CharacterSprites {
   walk: Record<Direction, [SpriteData, SpriteData, SpriteData, SpriteData]>
   typing: Record<Direction, [SpriteData, SpriteData]>
   reading: Record<Direction, [SpriteData, SpriteData]>
+  writing?: Record<Direction, [SpriteData, SpriteData]>
+  searching?: Record<Direction, [SpriteData, SpriteData]>
+  browsing?: Record<Direction, [SpriteData, SpriteData]>
+  thinking?: Record<Direction, [SpriteData, SpriteData]>
+  phone?: Record<Direction, [SpriteData, SpriteData]>
+  presenting?: Record<Direction, [SpriteData, SpriteData]>
+  coffee?: Record<Direction, [SpriteData, SpriteData]>
+  celebrating?: Record<Direction, [SpriteData, SpriteData]>
 }
 
 const spriteCache = new Map<string, CharacterSprites>()
@@ -1305,6 +1339,15 @@ function hueShiftSprites(sprites: CharacterSprites, hueShift: number): Character
     [shift(arr[0]), shift(arr[1]), shift(arr[2]), shift(arr[3])]
   const shiftPair = (arr: [SpriteData, SpriteData]): [SpriteData, SpriteData] =>
     [shift(arr[0]), shift(arr[1])]
+  const shiftOptional = (rec?: Record<Direction, [SpriteData, SpriteData]>): Record<Direction, [SpriteData, SpriteData]> | undefined => {
+    if (!rec) return undefined
+    return {
+      [Dir.DOWN]: shiftPair(rec[Dir.DOWN]),
+      [Dir.UP]: shiftPair(rec[Dir.UP]),
+      [Dir.RIGHT]: shiftPair(rec[Dir.RIGHT]),
+      [Dir.LEFT]: shiftPair(rec[Dir.LEFT]),
+    } as Record<Direction, [SpriteData, SpriteData]>
+  }
   return {
     walk: {
       [Dir.DOWN]: shiftWalk(sprites.walk[Dir.DOWN]),
@@ -1324,6 +1367,14 @@ function hueShiftSprites(sprites: CharacterSprites, hueShift: number): Character
       [Dir.RIGHT]: shiftPair(sprites.reading[Dir.RIGHT]),
       [Dir.LEFT]: shiftPair(sprites.reading[Dir.LEFT]),
     } as Record<Direction, [SpriteData, SpriteData]>,
+    writing: shiftOptional(sprites.writing),
+    searching: shiftOptional(sprites.searching),
+    browsing: shiftOptional(sprites.browsing),
+    thinking: shiftOptional(sprites.thinking),
+    phone: shiftOptional(sprites.phone),
+    presenting: shiftOptional(sprites.presenting),
+    coffee: shiftOptional(sprites.coffee),
+    celebrating: shiftOptional(sprites.celebrating),
   }
 }
 
@@ -1341,6 +1392,19 @@ export function getCharacterSprites(paletteIndex: number, hueShift = 0): Charact
     const u = char.up
     const rt = char.right
     const flip = flipSpriteHorizontal
+
+    // Helper to safely extract a 2-frame pair at a given index (undefined if missing)
+    const dirPair = (
+      da: SpriteData[], ua: SpriteData[], ra: SpriteData[], i: number,
+    ): Record<Direction, [SpriteData, SpriteData]> | undefined => {
+      if (i + 1 >= da.length) return undefined
+      return {
+        [Dir.DOWN]: [da[i], da[i + 1]],
+        [Dir.UP]: [ua[i], ua[i + 1]],
+        [Dir.RIGHT]: [ra[i], ra[i + 1]],
+        [Dir.LEFT]: [flip(ra[i]), flip(ra[i + 1])],
+      } as Record<Direction, [SpriteData, SpriteData]>
+    }
 
     sprites = {
       walk: {
@@ -1361,12 +1425,31 @@ export function getCharacterSprites(paletteIndex: number, hueShift = 0): Charact
         [Dir.RIGHT]: [rt[5], rt[6]],
         [Dir.LEFT]: [flip(rt[5]), flip(rt[6])],
       },
+      writing: dirPair(d, u, rt, 7),
+      searching: dirPair(d, u, rt, 9),
+      browsing: dirPair(d, u, rt, 11),
+      thinking: dirPair(d, u, rt, 13),
+      phone: dirPair(d, u, rt, 15),
+      presenting: dirPair(d, u, rt, 17),
+      coffee: dirPair(d, u, rt, 19),
+      celebrating: dirPair(d, u, rt, 21),
     }
   } else {
     // Fallback: use hardcoded templates with palette swapping
     const pal = CHARACTER_PALETTES[paletteIndex % CHARACTER_PALETTES.length]
     const r = (t: TemplateCell[][]) => resolveTemplate(t, pal)
     const rf = (t: TemplateCell[][]) => resolveTemplate(flipHorizontal(t), pal)
+
+    const templatePair = (
+      d1: TemplateCell[][], d2: TemplateCell[][],
+      u1: TemplateCell[][], u2: TemplateCell[][],
+      r1: TemplateCell[][], r2: TemplateCell[][],
+    ): Record<Direction, [SpriteData, SpriteData]> => ({
+      [Dir.DOWN]: [r(d1), r(d2)],
+      [Dir.UP]: [r(u1), r(u2)],
+      [Dir.RIGHT]: [r(r1), r(r2)],
+      [Dir.LEFT]: [rf(r1), rf(r2)],
+    } as Record<Direction, [SpriteData, SpriteData]>)
 
     sprites = {
       walk: {
@@ -1375,18 +1458,16 @@ export function getCharacterSprites(paletteIndex: number, hueShift = 0): Charact
         [Dir.RIGHT]: [r(CHAR_WALK_RIGHT_1), r(CHAR_WALK_RIGHT_2), r(CHAR_WALK_RIGHT_3), r(CHAR_WALK_RIGHT_2)],
         [Dir.LEFT]: [rf(CHAR_WALK_RIGHT_1), rf(CHAR_WALK_RIGHT_2), rf(CHAR_WALK_RIGHT_3), rf(CHAR_WALK_RIGHT_2)],
       },
-      typing: {
-        [Dir.DOWN]: [r(CHAR_DOWN_TYPE_1), r(CHAR_DOWN_TYPE_2)],
-        [Dir.UP]: [r(CHAR_UP_TYPE_1), r(CHAR_UP_TYPE_2)],
-        [Dir.RIGHT]: [r(CHAR_RIGHT_TYPE_1), r(CHAR_RIGHT_TYPE_2)],
-        [Dir.LEFT]: [rf(CHAR_RIGHT_TYPE_1), rf(CHAR_RIGHT_TYPE_2)],
-      },
-      reading: {
-        [Dir.DOWN]: [r(CHAR_DOWN_READ_1), r(CHAR_DOWN_READ_2)],
-        [Dir.UP]: [r(CHAR_UP_READ_1), r(CHAR_UP_READ_2)],
-        [Dir.RIGHT]: [r(CHAR_RIGHT_READ_1), r(CHAR_RIGHT_READ_2)],
-        [Dir.LEFT]: [rf(CHAR_RIGHT_READ_1), rf(CHAR_RIGHT_READ_2)],
-      },
+      typing: templatePair(CHAR_DOWN_TYPE_1, CHAR_DOWN_TYPE_2, CHAR_UP_TYPE_1, CHAR_UP_TYPE_2, CHAR_RIGHT_TYPE_1, CHAR_RIGHT_TYPE_2),
+      reading: templatePair(CHAR_DOWN_READ_1, CHAR_DOWN_READ_2, CHAR_UP_READ_1, CHAR_UP_READ_2, CHAR_RIGHT_READ_1, CHAR_RIGHT_READ_2),
+      writing: templatePair(AT.DOWN_WRITE_1, AT.DOWN_WRITE_2, AT.UP_WRITE_1, AT.UP_WRITE_2, AT.RIGHT_WRITE_1, AT.RIGHT_WRITE_2),
+      searching: templatePair(AT.DOWN_SEARCH_1, AT.DOWN_SEARCH_2, AT.UP_SEARCH_1, AT.UP_SEARCH_2, AT.RIGHT_SEARCH_1, AT.RIGHT_SEARCH_2),
+      browsing: templatePair(AT.DOWN_BROWSE_1, AT.DOWN_BROWSE_2, AT.UP_BROWSE_1, AT.UP_BROWSE_2, AT.RIGHT_BROWSE_1, AT.RIGHT_BROWSE_2),
+      thinking: templatePair(AT.DOWN_THINK_1, AT.DOWN_THINK_2, AT.UP_THINK_1, AT.UP_THINK_2, AT.RIGHT_THINK_1, AT.RIGHT_THINK_2),
+      phone: templatePair(AT.DOWN_PHONE_1, AT.DOWN_PHONE_2, AT.UP_PHONE_1, AT.UP_PHONE_2, AT.RIGHT_PHONE_1, AT.RIGHT_PHONE_2),
+      presenting: templatePair(AT.DOWN_PRESENT_1, AT.DOWN_PRESENT_2, AT.UP_PRESENT_1, AT.UP_PRESENT_2, AT.RIGHT_PRESENT_1, AT.RIGHT_PRESENT_2),
+      coffee: templatePair(AT.DOWN_COFFEE_1, AT.DOWN_COFFEE_2, AT.UP_COFFEE_1, AT.UP_COFFEE_2, AT.RIGHT_COFFEE_1, AT.RIGHT_COFFEE_2),
+      celebrating: templatePair(AT.DOWN_CELEBRATE_1, AT.DOWN_CELEBRATE_2, AT.UP_CELEBRATE_1, AT.UP_CELEBRATE_2, AT.RIGHT_CELEBRATE_1, AT.RIGHT_CELEBRATE_2),
     }
   }
 

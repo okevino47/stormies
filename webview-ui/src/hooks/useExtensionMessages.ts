@@ -177,6 +177,7 @@ export function useExtensionMessages(
         os.setAgentTool(id, toolName)
         os.setAgentActive(id, true)
         os.clearPermissionBubble(id)
+        os.clearThinkingText(id)
         // Create sub-agent character for Task tool subtasks
         if (status.startsWith('Subtask:')) {
           const label = status.slice('Subtask:'.length).trim()
@@ -216,6 +217,7 @@ export function useExtensionMessages(
         setSubagentCharacters((prev) => prev.filter((s) => s.parentAgentId !== id))
         os.setAgentTool(id, null)
         os.clearPermissionBubble(id)
+        os.clearThinkingText(id)
       } else if (msg.type === 'agentSelected') {
         const id = msg.id as number
         setSelectedAgent(id)
@@ -233,9 +235,14 @@ export function useExtensionMessages(
         })
         os.setAgentActive(id, status === 'active')
         if (status === 'waiting') {
+          os.triggerCelebration(id)
           os.showWaitingBubble(id)
           playDoneSound()
         }
+      } else if (msg.type === 'agentThinking') {
+        const id = msg.id as number
+        const text = msg.text as string
+        os.setThinkingText(id, text)
       } else if (msg.type === 'agentToolPermission') {
         const id = msg.id as number
         setAgentTools((prev) => {

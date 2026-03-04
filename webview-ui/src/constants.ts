@@ -98,6 +98,13 @@ export const NOTIFICATION_NOTE_2_START_SEC = 0.1
 export const NOTIFICATION_NOTE_DURATION_SEC = 0.18
 export const NOTIFICATION_VOLUME = 0.14
 
+// ── Activity Animations ─────────────────────────────────────
+export const CELEBRATE_DURATION_SEC = 1.5
+
+// ── Thinking Bubble ─────────────────────────────────────────
+export const THINKING_BUBBLE_DURATION_SEC = 5
+export const THINKING_BUBBLE_FADE_SEC = 0.5
+
 // ── Game Logic ───────────────────────────────────────────────
 export const MAX_DELTA_TIME_SEC = 0.1
 export const WAITING_BUBBLE_DURATION_SEC = 2.0

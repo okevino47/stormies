@@ -17,6 +17,7 @@ class AgentManager(
     private val timerManager: TimerManager,
     private val jsonlWatcher: JsonlWatcher,
     val agents: ConcurrentHashMap<Int, AgentState>,
+    private val projectBasePath: String? = null,
 ) {
 
     private val gson = Gson()
@@ -26,16 +27,36 @@ class AgentManager(
     private val jsonlPollTimers = ConcurrentHashMap<Int, ScheduledFuture<*>>()
 
     /**
-     * Get the Claude project directory for a given path.
-     * Matches Claude's convention: path with special chars replaced by '-'.
+     * Get the Claude project directory for the current IntelliJ project.
+     * Claude Code names directories by replacing '/' with '-' in the absolute path.
+     * If projectBasePath is set, only return the matching directory.
      */
     fun getProjectDirs(): List<String> {
         val claudeProjectsDir = File(System.getProperty("user.home"), ".claude/projects")
         if (!claudeProjectsDir.exists()) return emptyList()
-        return claudeProjectsDir.listFiles()
+
+        val allDirs = claudeProjectsDir.listFiles()
             ?.filter { it.isDirectory }
-            ?.map { it.absolutePath }
-            ?: emptyList()
+            ?: return emptyList()
+
+        if (projectBasePath != null) {
+            // Claude convention: /Users/kevin/foo -> -Users-kevin-foo
+            val expectedDirName = projectBasePath.replace(File.separatorChar, '-')
+            val matched = allDirs.filter { it.name == expectedDirName }
+            if (matched.isNotEmpty()) {
+                return matched.map { it.absolutePath }
+            }
+            // Fallback: try matching without leading separator
+            val altName = projectBasePath.trimStart(File.separatorChar).replace(File.separatorChar, '-')
+            val altMatched = allDirs.filter { it.name == altName }
+            if (altMatched.isNotEmpty()) {
+                return altMatched.map { it.absolutePath }
+            }
+            LOG.info("No Claude project dir matched for: $projectBasePath (expected: $expectedDirName)")
+            return emptyList()
+        }
+
+        return allDirs.map { it.absolutePath }
     }
 
     /**

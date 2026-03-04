@@ -26,6 +26,10 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <b>1.0.1</b>
+        <ul>
+            <li>Fixed plugin loading issue after install</li>
+        </ul>
         <b>1.0.0</b>
         <ul>
             <li>Initial release</li>

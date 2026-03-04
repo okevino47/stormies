@@ -12,9 +12,12 @@ import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.ui.content.ContentFactory
 import com.intellij.ui.jcef.JBCefBrowser
 import com.intellij.ui.jcef.JBCefBrowserBuilder
+import com.intellij.ide.plugins.PluginManagerCore
+import com.intellij.openapi.extensions.PluginId
 import java.io.File
 import java.io.InputStream
 import java.net.URL
+import java.net.URLDecoder
 import java.util.concurrent.ConcurrentHashMap
 import java.util.jar.JarFile
 import javax.swing.JFileChooser
@@ -54,7 +57,7 @@ class PixelAgentsPanel(private val project: Project) : Disposable {
         timerManager = TimerManager(bridge)
         transcriptParser = TranscriptParser(bridge, timerManager)
         jsonlWatcher = JsonlWatcher(bridge, timerManager, transcriptParser, agents)
-        agentManager = AgentManager(bridge, timerManager, jsonlWatcher, agents)
+        agentManager = AgentManager(bridge, timerManager, jsonlWatcher, agents, project.basePath)
         layoutPersistence = LayoutPersistence(bridge)
 
         bridge.injectBridge()
@@ -120,28 +123,76 @@ class PixelAgentsPanel(private val project: Project) : Disposable {
      * Find the webview resources directory. Handles both:
      * - Development (running from filesystem via `runIde`)
      * - Production (running from plugin JAR)
+     *
+     * Uses multiple strategies with fallbacks for robustness.
      */
     private fun resolveWebviewDirectory(): File? {
-        val resourceUrl: URL = javaClass.getResource("/webview/index.html") ?: return null
+        // Strategy 1: Standard classloader resource lookup
+        val resourceUrl: URL? = javaClass.getResource("/webview/index.html")
+            ?: javaClass.classLoader.getResource("webview/index.html")
 
-        when (resourceUrl.protocol) {
-            "file" -> {
-                // Development mode: resources are on the filesystem
-                val indexFile = File(resourceUrl.toURI())
-                val webviewDir = indexFile.parentFile
-                LOG.info("Running from filesystem: ${webviewDir.absolutePath}")
-                return webviewDir
+        if (resourceUrl != null) {
+            LOG.info("Found webview resource via classloader: ${resourceUrl.protocol}")
+            when (resourceUrl.protocol) {
+                "file" -> {
+                    val indexFile = File(resourceUrl.toURI())
+                    val webviewDir = indexFile.parentFile
+                    LOG.info("Running from filesystem: ${webviewDir.absolutePath}")
+                    return webviewDir
+                }
+                "jar" -> {
+                    LOG.info("Running from JAR, extracting webview resources...")
+                    val result = extractJarResources(resourceUrl)
+                    if (result != null) return result
+                    LOG.warn("JAR extraction via classloader URL failed, trying fallback...")
+                }
             }
-            "jar" -> {
-                // Production mode: resources are inside the plugin JAR
-                // Extract to temp directory
-                LOG.info("Running from JAR, extracting webview resources...")
-                return extractJarResources(resourceUrl)
-            }
-            else -> {
-                LOG.warn("Unknown resource protocol: ${resourceUrl.protocol}")
+        } else {
+            LOG.info("Classloader resource lookup returned null, trying PluginManagerCore fallback...")
+        }
+
+        // Strategy 2: Use IntelliJ Platform API to locate the plugin JAR directly
+        return resolveFromPluginPath()
+    }
+
+    /**
+     * Fallback: use PluginManagerCore to find the plugin installation directory
+     * and extract webview resources from the JAR.
+     */
+    private fun resolveFromPluginPath(): File? {
+        try {
+            val pluginId = PluginId.getId("com.pixelagents.jetbrains")
+            val descriptor = PluginManagerCore.getPlugin(pluginId) ?: run {
+                LOG.warn("Plugin descriptor not found for com.pixelagents.jetbrains")
                 return null
             }
+            val pluginPath = descriptor.pluginPath
+            LOG.info("Plugin path from PluginManagerCore: $pluginPath")
+
+            // The plugin is typically at: pluginDir/lib/stormies-pixel-agents-*.jar
+            val libDir = pluginPath.resolve("lib").toFile()
+            if (libDir.isDirectory) {
+                val pluginJar = libDir.listFiles()?.find {
+                    it.name.startsWith("stormies-pixel-agents") && it.name.endsWith(".jar")
+                }
+                if (pluginJar != null) {
+                    LOG.info("Found plugin JAR via PluginManagerCore: ${pluginJar.absolutePath}")
+                    return extractFromJarFile(pluginJar)
+                }
+            }
+
+            // Single-JAR plugin (pluginPath itself is the JAR)
+            val pluginFile = pluginPath.toFile()
+            if (pluginFile.isFile && pluginFile.name.endsWith(".jar")) {
+                LOG.info("Plugin is a single JAR: ${pluginFile.absolutePath}")
+                return extractFromJarFile(pluginFile)
+            }
+
+            LOG.warn("Could not locate plugin JAR in: $pluginPath")
+            return null
+        } catch (e: Exception) {
+            LOG.error("Failed to resolve webview from plugin path", e)
+            return null
         }
     }
 
@@ -149,19 +200,30 @@ class PixelAgentsPanel(private val project: Project) : Disposable {
      * Extract all /webview/ resources from the JAR to a temp directory.
      */
     private fun extractJarResources(resourceUrl: URL): File? {
+        try {
+            // Parse JAR path from URL like "jar:file:/path/to/plugin.jar!/webview/index.html"
+            val jarPath = URLDecoder.decode(
+                resourceUrl.path.substringAfter("file:").substringBefore("!"),
+                "UTF-8"
+            )
+            return extractFromJarFile(File(jarPath))
+        } catch (e: Exception) {
+            LOG.error("Failed to extract JAR resources from URL", e)
+            return null
+        }
+    }
+
+    /**
+     * Extract all /webview/ entries from a JAR file to a temp directory.
+     */
+    private fun extractFromJarFile(jarFile: File): File? {
         val tmpDir = File(System.getProperty("java.io.tmpdir"), "pixel-agents-webview")
         if (tmpDir.exists()) tmpDir.deleteRecursively()
         tmpDir.mkdirs()
         tempWebviewDir = tmpDir
 
         try {
-            // Parse JAR path from URL like "jar:file:/path/to/plugin.jar!/webview/index.html"
-            val jarPath = resourceUrl.path
-                .substringAfter("file:")
-                .substringBefore("!")
-            val jarFile = JarFile(jarPath)
-
-            jarFile.use { jar ->
+            JarFile(jarFile).use { jar ->
                 val entries = jar.entries()
                 while (entries.hasMoreElements()) {
                     val entry = entries.nextElement()
@@ -178,10 +240,16 @@ class PixelAgentsPanel(private val project: Project) : Disposable {
                 }
             }
 
-            LOG.info("Extracted webview resources to: ${tmpDir.absolutePath}")
-            return tmpDir
+            // Verify extraction worked
+            if (File(tmpDir, "index.html").exists()) {
+                LOG.info("Extracted webview resources to: ${tmpDir.absolutePath}")
+                return tmpDir
+            }
+
+            LOG.warn("Extraction succeeded but index.html not found in output")
+            return null
         } catch (e: Exception) {
-            LOG.error("Failed to extract JAR resources", e)
+            LOG.error("Failed to extract from JAR: ${jarFile.absolutePath}", e)
             return null
         }
     }

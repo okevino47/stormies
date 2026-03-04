@@ -42,6 +42,7 @@ class TranscriptParser(
             }
             "AskUserQuestion" -> "Waiting for your answer"
             "EnterPlanMode" -> "Planning"
+            "ExitPlanMode" -> "Finishing plan"
             "NotebookEdit" -> "Editing notebook"
             else -> "Using $toolName"
         }
@@ -96,7 +97,19 @@ class TranscriptParser(
         val content = record.getAsJsonObject("message")?.getAsJsonArray("content") ?: return
         val hasToolUse = content.any { it.asJsonObject.get("type")?.asString == "tool_use" }
 
-        if (hasToolUse) {
+        // Process thinking blocks (extended thinking / reasoning)
+    for (elem in content) {
+        val block = elem.asJsonObject
+        if (block.get("type")?.asString == "thinking") {
+            val thinking = block.get("thinking")?.asString ?: continue
+            val words = thinking.trim().split("\\s+".toRegex())
+            if (words.size < 3) continue
+            val summary = words.take(8).joinToString(" ") + "..."
+            bridge.postMessage(mapOf("type" to "agentThinking", "id" to agentId, "text" to summary))
+        }
+    }
+
+    if (hasToolUse) {
             timerManager.cancelWaitingTimer(agentId)
             agent.isWaiting = false
             agent.hadToolsInTurn = true

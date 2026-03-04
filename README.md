@@ -28,6 +28,7 @@ The plugin monitors Claude Code's session transcript files (`~/.claude/projects/
 - **Character Animations** — Walking (4-frame directional), typing, reading, and idle animations with autonomous wander behavior
 - **Agent List Panel** — Expandable bottom-right panel showing all active agents with status dots (active, waiting for permission) and activity text
 - **Tool Status Overlays** — Real-time activity bubbles above characters showing what each agent is doing (file being edited, command being run, etc.)
+- **Thinking Thought Bubbles** — When Claude enters its thinking/reasoning phase, a cloud-style thought bubble appears above the character showing a short summary of what it's pondering, with animated fade-out
 
 ### Pet Sub-Agents
 

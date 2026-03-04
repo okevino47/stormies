@@ -12,6 +12,8 @@ import {
   CHARACTER_SITTING_OFFSET_PX,
   CHARACTER_HIT_HALF_WIDTH,
   CHARACTER_HIT_HEIGHT,
+  CELEBRATE_DURATION_SEC,
+  THINKING_BUBBLE_DURATION_SEC,
 } from '../../constants.js'
 import type { Character, Seat, FurnitureInstance, TileType as TileTypeVal, OfficeLayout, PlacedFurniture } from '../types.js'
 import { createCharacter, updateCharacter } from './characters.js'
@@ -612,6 +614,13 @@ export class OfficeState {
     }
   }
 
+  triggerCelebration(id: number): void {
+    const ch = this.characters.get(id)
+    if (ch) {
+      ch.celebrateTimer = CELEBRATE_DURATION_SEC
+    }
+  }
+
   showWaitingBubble(id: number): void {
     const ch = this.characters.get(id)
     if (ch) {
@@ -630,6 +639,22 @@ export class OfficeState {
     } else if (ch.bubbleType === 'waiting') {
       // Trigger immediate fade (0.3s remaining)
       ch.bubbleTimer = Math.min(ch.bubbleTimer, DISMISS_BUBBLE_FAST_FADE_SEC)
+    }
+  }
+
+  setThinkingText(id: number, text: string): void {
+    const ch = this.characters.get(id)
+    if (ch) {
+      ch.thinkingText = text
+      ch.thinkingTimer = THINKING_BUBBLE_DURATION_SEC
+    }
+  }
+
+  clearThinkingText(id: number): void {
+    const ch = this.characters.get(id)
+    if (ch) {
+      ch.thinkingText = null
+      ch.thinkingTimer = 0
     }
   }
 
@@ -664,6 +689,15 @@ export class OfficeState {
         if (ch.bubbleTimer <= 0) {
           ch.bubbleType = null
           ch.bubbleTimer = 0
+        }
+      }
+
+      // Tick thinking bubble timer
+      if (ch.thinkingText) {
+        ch.thinkingTimer -= dt
+        if (ch.thinkingTimer <= 0) {
+          ch.thinkingText = null
+          ch.thinkingTimer = 0
         }
       }
     }

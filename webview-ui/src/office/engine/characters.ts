@@ -1,4 +1,4 @@
-import { CharacterState, Direction, TILE_SIZE } from '../types.js'
+import { CharacterState, Direction, ActivityAnimation, TILE_SIZE } from '../types.js'
 import type { Character, Seat, SpriteData, TileType as TileTypeVal } from '../types.js'
 import type { CharacterSprites } from '../sprites/spriteData.js'
 import { findPath } from '../layout/tileMap.js'
@@ -14,12 +14,66 @@ import {
   SEAT_REST_MAX_SEC,
 } from '../../constants.js'
 
-/** Tools that show reading animation instead of typing */
-const READING_TOOLS = new Set(['Read', 'Grep', 'Glob', 'WebFetch', 'WebSearch'])
+/** Map tool names to activity animations */
+const TOOL_ANIMATION_MAP: Record<string, ActivityAnimation> = {
+  Write: ActivityAnimation.TYPING,
+  Bash: ActivityAnimation.TYPING,
+  Skill: ActivityAnimation.TYPING,
+  Read: ActivityAnimation.READING,
+  Edit: ActivityAnimation.WRITING,
+  NotebookEdit: ActivityAnimation.WRITING,
+  Grep: ActivityAnimation.SEARCHING,
+  Glob: ActivityAnimation.SEARCHING,
+  WebFetch: ActivityAnimation.BROWSING,
+  WebSearch: ActivityAnimation.BROWSING,
+  EnterPlanMode: ActivityAnimation.THINKING,
+  AskUserQuestion: ActivityAnimation.PHONE,
+  TaskCreate: ActivityAnimation.PRESENTING,
+  TaskUpdate: ActivityAnimation.PRESENTING,
+  TaskList: ActivityAnimation.PRESENTING,
+  TaskGet: ActivityAnimation.PRESENTING,
+  Agent: ActivityAnimation.PRESENTING,
+}
 
+/** Get the activity animation for a given tool name */
+export function getToolAnimation(tool: string | null): ActivityAnimation {
+  if (!tool) return ActivityAnimation.COFFEE
+  return TOOL_ANIMATION_MAP[tool] ?? ActivityAnimation.TYPING
+}
+
+/** Backward-compat: tools that used to show reading animation */
 export function isReadingTool(tool: string | null): boolean {
   if (!tool) return false
-  return READING_TOOLS.has(tool)
+  const anim = getToolAnimation(tool)
+  return anim === ActivityAnimation.READING
+}
+
+/** Fallback chains: if an animation isn't available, fall back to a similar one */
+const ANIMATION_FALLBACKS: Partial<Record<ActivityAnimation, ActivityAnimation>> = {
+  [ActivityAnimation.WRITING]: ActivityAnimation.TYPING,
+  [ActivityAnimation.SEARCHING]: ActivityAnimation.READING,
+  [ActivityAnimation.BROWSING]: ActivityAnimation.READING,
+  [ActivityAnimation.THINKING]: ActivityAnimation.READING,
+  [ActivityAnimation.PHONE]: ActivityAnimation.TYPING,
+  [ActivityAnimation.PRESENTING]: ActivityAnimation.TYPING,
+  [ActivityAnimation.COFFEE]: ActivityAnimation.READING,
+  [ActivityAnimation.CELEBRATING]: ActivityAnimation.TYPING,
+}
+
+/** Get the sprite frames for an activity animation, with fallback chain */
+export function getActivityFrames(
+  sprites: CharacterSprites,
+  animation: ActivityAnimation,
+  dir: Direction,
+): [SpriteData, SpriteData] {
+  let anim: ActivityAnimation | undefined = animation
+  while (anim) {
+    const rec = sprites[anim]
+    if (rec) return rec[dir]
+    anim = ANIMATION_FALLBACKS[anim]
+  }
+  // Ultimate fallback: typing is always present
+  return sprites.typing[dir]
 }
 
 /** Pixel center of a tile */
@@ -76,10 +130,13 @@ export function createCharacter(
     seatTimer: 0,
     isSubagent: false,
     parentAgentId: null,
+    celebrateTimer: 0,
     matrixEffect: null,
     matrixEffectTimer: 0,
     matrixEffectSeeds: [],
     name,
+    thinkingText: null,
+    thinkingTimer: 0,
   }
 }
 
@@ -98,6 +155,10 @@ export function updateCharacter(
       if (ch.frameTimer >= TYPE_FRAME_DURATION_SEC) {
         ch.frameTimer -= TYPE_FRAME_DURATION_SEC
         ch.frame = (ch.frame + 1) % 2
+      }
+      // Tick celebration timer
+      if (ch.celebrateTimer > 0) {
+        ch.celebrateTimer = Math.max(0, ch.celebrateTimer - dt)
       }
       // If no longer active, stand up and start wandering (after seatTimer expires)
       if (!ch.isActive) {
@@ -282,11 +343,14 @@ export function updateCharacter(
 /** Get the correct sprite frame for a character's current state and direction */
 export function getCharacterSprite(ch: Character, sprites: CharacterSprites): SpriteData {
   switch (ch.state) {
-    case CharacterState.TYPE:
-      if (isReadingTool(ch.currentTool)) {
-        return sprites.reading[ch.dir][ch.frame % 2]
-      }
-      return sprites.typing[ch.dir][ch.frame % 2]
+    case CharacterState.TYPE: {
+      // Celebration overrides normal activity animation
+      const animation = ch.celebrateTimer > 0
+        ? ActivityAnimation.CELEBRATING
+        : getToolAnimation(ch.currentTool)
+      const frames = getActivityFrames(sprites, animation, ch.dir)
+      return frames[ch.frame % 2]
+    }
     case CharacterState.WALK:
       return sprites.walk[ch.dir][ch.frame % 4]
     case CharacterState.IDLE:
