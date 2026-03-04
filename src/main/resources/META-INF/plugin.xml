@@ -26,6 +26,11 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <b>1.2.0</b>
+        <ul>
+            <li>Performance optimization — shared overlay tick at ~20fps, reduced backend polling intervals</li>
+            <li>Added Performance Impact section to README with resource usage KPIs</li>
+        </ul>
         <b>1.1.0</b>
         <ul>
             <li>Thinking thought bubbles — cloud-style bubbles show what Claude is pondering during its reasoning phase</li>

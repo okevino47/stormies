@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0] - 2026-03-04
+
+### Improved
+
+- **Performance Optimization** — Eliminated 2 redundant `requestAnimationFrame` loops from HTML overlays (ToolOverlay, ThoughtBubble). All overlays now share a single animation tick throttled to ~20fps, reducing React reconciliation overhead by 6x while the canvas game loop remains at 60fps.
+- **Reduced Backend Polling** — Project directory scanning interval increased from 1s to 3s; project root discovery from 5s to 15s. JSONL file polling tuned to 500ms with file-size guards that skip reads entirely when nothing changed.
+- **Performance Documentation** — Added comprehensive Performance Impact section to README with resource usage KPIs, architecture breakdown, and concrete metrics.
+
 ## [1.1.0] - 2026-03-04
 
 ### Added

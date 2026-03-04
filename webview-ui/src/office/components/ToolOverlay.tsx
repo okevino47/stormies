@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import type { ToolActivity } from '../types.js'
 import type { OfficeState } from '../engine/officeState.js'
 import type { SubagentCharacter } from '../../hooks/useExtensionMessages.js'
@@ -14,6 +13,8 @@ interface ToolOverlayProps {
   zoom: number
   panRef: React.RefObject<{ x: number; y: number }>
   onCloseAgent: (id: number) => void
+  /** External tick counter driving re-renders (from useOverlayTick) */
+  overlayTick: number
 }
 
 /** Derive a short human-readable activity string from tools/status */
@@ -49,17 +50,10 @@ export function ToolOverlay({
   zoom,
   panRef,
   onCloseAgent,
+  overlayTick,
 }: ToolOverlayProps) {
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    let rafId = 0
-    const tick = () => {
-      setTick((n) => n + 1)
-      rafId = requestAnimationFrame(tick)
-    }
-    rafId = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafId)
-  }, [])
+  // Force dependency on overlayTick for re-renders (driven by shared useOverlayTick)
+  void overlayTick
 
   const el = containerRef.current
   if (!el) return null

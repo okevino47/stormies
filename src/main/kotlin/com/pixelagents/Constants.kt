@@ -2,8 +2,8 @@ package com.pixelagents
 
 // ── Timing (ms) ──────────────────────────────────────────────
 const val JSONL_POLL_INTERVAL_MS = 1000L
-const val FILE_WATCHER_POLL_INTERVAL_MS = 1000L
-const val PROJECT_SCAN_INTERVAL_MS = 1000L
+const val FILE_WATCHER_POLL_INTERVAL_MS = 500L
+const val PROJECT_SCAN_INTERVAL_MS = 3000L
 const val TOOL_DONE_DELAY_MS = 300L
 const val PERMISSION_TIMER_DELAY_MS = 7000L
 const val TEXT_IDLE_DELAY_MS = 5000L

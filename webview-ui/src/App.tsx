@@ -10,6 +10,7 @@ import { isRotatable } from './office/layout/furnitureCatalog.js'
 import { vscode } from './vscodeApi.js'
 import { useExtensionMessages } from './hooks/useExtensionMessages.js'
 import { PULSE_ANIMATION_DURATION_SEC } from './constants.js'
+import { useOverlayTick } from './hooks/useOverlayTick.js'
 import { useEditorActions } from './hooks/useEditorActions.js'
 import { useEditorKeyboard } from './hooks/useEditorKeyboard.js'
 import { ZoomControls } from './components/ZoomControls.js'
@@ -125,6 +126,7 @@ function App() {
 
   const { agents, selectedAgent, agentTools, agentStatuses, subagentTools, subagentCharacters, layoutReady, loadedAssets, workspaceFolders } = useExtensionMessages(getOfficeState, editor.setLastSavedLayout, isEditDirty)
 
+  const overlayTick = useOverlayTick()
   const [isDebugMode, setIsDebugMode] = useState(false)
   const [uiVisible, setUiVisible] = useState(true)
 
@@ -348,6 +350,7 @@ function App() {
           zoom={editor.zoom}
           panRef={editor.panRef}
           onCloseAgent={handleCloseAgent}
+          overlayTick={overlayTick}
         />
       )}
 
@@ -357,6 +360,7 @@ function App() {
           containerRef={containerRef}
           zoom={editor.zoom}
           panRef={editor.panRef}
+          overlayTick={overlayTick}
         />
       )}
 

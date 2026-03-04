@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import type { OfficeState } from '../engine/officeState.js'
 import { TILE_SIZE, CharacterState } from '../types.js'
 import {
@@ -12,19 +11,13 @@ interface ThoughtBubbleProps {
   containerRef: React.RefObject<HTMLDivElement | null>
   zoom: number
   panRef: React.RefObject<{ x: number; y: number }>
+  /** External tick counter driving re-renders (from useOverlayTick) */
+  overlayTick: number
 }
 
-export function ThoughtBubble({ officeState, containerRef, zoom, panRef }: ThoughtBubbleProps) {
-  const [, setTick] = useState(0)
-  useEffect(() => {
-    let rafId = 0
-    const tick = () => {
-      setTick((n) => n + 1)
-      rafId = requestAnimationFrame(tick)
-    }
-    rafId = requestAnimationFrame(tick)
-    return () => cancelAnimationFrame(rafId)
-  }, [])
+export function ThoughtBubble({ officeState, containerRef, zoom, panRef, overlayTick }: ThoughtBubbleProps) {
+  // Force dependency on overlayTick for re-renders (driven by shared useOverlayTick)
+  void overlayTick
 
   const el = containerRef.current
   if (!el) return null
