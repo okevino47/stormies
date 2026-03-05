@@ -28,6 +28,7 @@ The plugin monitors Claude Code's session transcript files (`~/.claude/projects/
 - **Character Animations** — Walking (4-frame directional), typing, reading, and idle animations with autonomous wander behavior
 - **Agent List Panel** — Expandable bottom-right panel showing all active agents with status dots (active, waiting for permission) and activity text
 - **Tool Status Overlays** — Real-time activity bubbles above characters showing what each agent is doing (file being edited, command being run, etc.)
+- **Activity Pop-up Bubbles** — Every new action (reading, editing, running commands, searching) triggers a 5-second pop-up bubble above the character, so you can see what each agent is working on at a glance without hovering
 - **Thinking Thought Bubbles** — When Claude enters its thinking/reasoning phase, a cloud-style thought bubble appears above the character showing a short summary of what it's pondering, with animated fade-out
 
 ### Pet Sub-Agents
@@ -67,7 +68,7 @@ The plugin monitors Claude Code's session transcript files (`~/.claude/projects/
 ### Audio & Visual Effects
 
 - **Matrix Spawn/Despawn** — Characters appear and disappear with an animated matrix rain column effect
-- **Notification Chime** — Optional two-note ascending chime when tools complete
+- **Sound Notifications** — A short ascending chime plays when an agent finishes its turn or needs your attention (permission prompt, waiting for input). This is one of the most practical features of the plugin: when working with Claude Code, you inevitably switch context — checking your browser, your phone, reading docs in another tab — and meanwhile Claude has been sitting idle waiting for a permission approval or your next instruction. The notification chime lets you safely multitask knowing you'll hear the moment Claude needs you. No more discovering 10 minutes later that your agent has been waiting since the moment you looked away. Toggleable in settings
 - **Vignette Overlay** — Subtle screen-edge darkening for atmosphere
 - **Zoom Controls** — 1x–8x zoom with on-screen buttons and Ctrl/Cmd+scroll
 
@@ -92,7 +93,7 @@ The plugin is designed to be lightweight and should have **near-zero impact** on
 | **File I/O** | 1 stat() per agent every 500ms | Checks file size only; reads new bytes incrementally via `RandomAccessFile.seek()` — skips entirely if unchanged |
 | **Directory scanning** | 1 listing every 3s (files), 15s (project dirs) | Single directory, filtered by `.jsonl` extension |
 | **Webview rendering** | 1 canvas RAF at 60fps | Standard for any canvas app; runs in JCEF process, not IDE JVM |
-| **Overlay updates** | Shared tick at ~20fps | Single `requestAnimationFrame` loop for all HTML overlays (tool status, thought bubbles) |
+| **Overlay updates** | Per-component RAF at 60fps | Each HTML overlay (tool status, thought bubbles, activity bubbles) runs its own `requestAnimationFrame` loop, isolated from the main app render cycle |
 | **Memory** | ~2-5 MB | Sprite data loaded once at startup; small state per agent (offsets, line buffers) |
 | **CPU (idle)** | < 0.5% | File stat() polling + canvas render; no work when files unchanged |
 | **CPU (active agent)** | ~1-2% | Incremental JSONL parsing + sprite animation; proportional to transcript write rate |
@@ -102,7 +103,7 @@ The plugin is designed to be lightweight and should have **near-zero impact** on
 - **No file watching API overhead** — Uses lightweight polling with file-size guards instead of OS-level file watchers, avoiding platform-specific quirks and lock contention.
 - **Incremental reads** — JSONL files are read from the last known offset, never re-scanned from the beginning.
 - **Isolated rendering** — All pixel art, DOM overlays, and React state live inside JCEF's Chromium sandbox. The IDE's Swing/AWT thread pool is never touched for rendering.
-- **Throttled overlays** — HTML overlays (tool bubbles, thought bubbles) share a single animation loop at 20fps instead of 60fps, reducing React reconciliation overhead by 6x.
+- **Isolated overlay rendering** — HTML overlays (tool bubbles, thought bubbles, activity bubbles) each run their own `requestAnimationFrame` loop, keeping re-renders localized to only the overlay components instead of triggering full app re-renders.
 - **Project-scoped detection** — Only watches the Claude project directory matching the current IDE project, not all projects on disk.
 
 ### Bottom Line

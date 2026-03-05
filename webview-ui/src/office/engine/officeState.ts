@@ -14,6 +14,7 @@ import {
   CHARACTER_HIT_HEIGHT,
   CELEBRATE_DURATION_SEC,
   THINKING_BUBBLE_DURATION_SEC,
+  ACTIVITY_BUBBLE_DURATION_SEC,
 } from '../../constants.js'
 import type { Character, Seat, FurnitureInstance, TileType as TileTypeVal, OfficeLayout, PlacedFurniture } from '../types.js'
 import { createCharacter, updateCharacter } from './characters.js'
@@ -658,6 +659,22 @@ export class OfficeState {
     }
   }
 
+  setActivityText(id: number, text: string): void {
+    const ch = this.characters.get(id)
+    if (ch) {
+      ch.activityText = text
+      ch.activityTimer = ACTIVITY_BUBBLE_DURATION_SEC
+    }
+  }
+
+  clearActivityText(id: number): void {
+    const ch = this.characters.get(id)
+    if (ch) {
+      ch.activityText = null
+      ch.activityTimer = 0
+    }
+  }
+
   update(dt: number): void {
     const toDelete: number[] = []
     for (const ch of this.characters.values()) {
@@ -698,6 +715,15 @@ export class OfficeState {
         if (ch.thinkingTimer <= 0) {
           ch.thinkingText = null
           ch.thinkingTimer = 0
+        }
+      }
+
+      // Tick activity bubble timer
+      if (ch.activityText) {
+        ch.activityTimer -= dt
+        if (ch.activityTimer <= 0) {
+          ch.activityText = null
+          ch.activityTimer = 0
         }
       }
     }

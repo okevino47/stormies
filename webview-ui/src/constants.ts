@@ -105,6 +105,10 @@ export const CELEBRATE_DURATION_SEC = 1.5
 export const THINKING_BUBBLE_DURATION_SEC = 5
 export const THINKING_BUBBLE_FADE_SEC = 0.5
 
+// ── Activity Bubble ─────────────────────────────────────────
+export const ACTIVITY_BUBBLE_DURATION_SEC = 5
+export const ACTIVITY_BUBBLE_FADE_SEC = 0.5
+
 // ── Game Logic ───────────────────────────────────────────────
 export const MAX_DELTA_TIME_SEC = 0.1
 export const WAITING_BUBBLE_DURATION_SEC = 2.0

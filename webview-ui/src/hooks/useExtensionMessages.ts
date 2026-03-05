@@ -177,7 +177,7 @@ export function useExtensionMessages(
         os.setAgentTool(id, toolName)
         os.setAgentActive(id, true)
         os.clearPermissionBubble(id)
-        os.clearThinkingText(id)
+        os.setActivityText(id, status)
         // Create sub-agent character for Task tool subtasks
         if (status.startsWith('Subtask:')) {
           const label = status.slice('Subtask:'.length).trim()
@@ -218,6 +218,7 @@ export function useExtensionMessages(
         os.setAgentTool(id, null)
         os.clearPermissionBubble(id)
         os.clearThinkingText(id)
+        os.clearActivityText(id)
       } else if (msg.type === 'agentSelected') {
         const id = msg.id as number
         setSelectedAgent(id)

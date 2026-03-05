@@ -26,9 +26,15 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <b>1.3.0</b>
+        <ul>
+            <li>Activity pop-up bubbles — every new action triggers a 5-second bubble showing what the agent is doing, no hover needed</li>
+            <li>Fixed thinking bubbles regression from v1.2.0 — bubbles now appear reliably</li>
+            <li>Fixed overlay performance regression — restored per-component render loops instead of full app re-renders</li>
+        </ul>
         <b>1.2.0</b>
         <ul>
-            <li>Performance optimization — shared overlay tick at ~20fps, reduced backend polling intervals</li>
+            <li>Performance optimization — reduced backend polling intervals</li>
             <li>Added Performance Impact section to README with resource usage KPIs</li>
         </ul>
         <b>1.1.0</b>

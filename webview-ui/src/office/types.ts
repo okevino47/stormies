@@ -228,6 +228,10 @@ export interface Character {
   thinkingText: string | null
   /** Countdown timer for thought bubble auto-dismiss */
   thinkingTimer: number
+  /** Current activity bubble text (from tool use), or null */
+  activityText: string | null
+  /** Countdown timer for activity bubble auto-dismiss */
+  activityTimer: number
 }
 
 export const PET_TYPE_COUNT = 10

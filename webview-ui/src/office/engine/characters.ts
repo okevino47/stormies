@@ -137,6 +137,8 @@ export function createCharacter(
     name,
     thinkingText: null,
     thinkingTimer: 0,
+    activityText: null,
+    activityTimer: 0,
   }
 }
 

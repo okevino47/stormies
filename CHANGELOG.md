@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.3.0] - 2026-03-05
+
+### Added
+
+- **Activity Pop-up Bubbles** — When an agent starts a new action (reading a file, running a command, editing code, searching, etc.), an activity bubble automatically pops up above the character for 5 seconds showing exactly what it's doing. Each new action resets the timer, so you always see the latest activity at a glance without needing to hover. Activity bubbles have a distinct blue-tinted style to differentiate them from thinking bubbles.
+
+### Fixed
+
+- **Thinking Bubbles Regression** — Fixed a critical bug introduced in v1.2.0 where thinking thought bubbles never appeared. The shared overlay tick optimization caused `agentThinking` and `agentToolStart` messages to arrive within the same render frame — the tool start immediately cleared the thinking text before it could ever be displayed. Thinking text now persists for its full 5-second duration regardless of tool activity.
+- **Overlay Performance Regression** — Reverted the shared `useOverlayTick` approach from v1.2.0 which re-rendered the entire React component tree at 20fps. Restored per-component `requestAnimationFrame` loops in ThoughtBubble and ToolOverlay, so only the overlay components re-render at display rate while the rest of the app renders only on state changes.
+
+### A Note on Sound Notifications
+
+One of the most impactful features of Stormies is something easy to overlook: **sound notifications**. When working with Claude Code, a huge amount of time is silently wasted because the agent finishes a task or hits a permission prompt — and you don't notice. You've switched to your browser, your phone, another terminal, or you're just reading documentation in another tab. Meanwhile Claude is sitting there, waiting for you, and the clock is ticking.
+
+Stormies plays a short ascending chime (E5 to B5) the moment an agent's turn ends or it needs your attention. This simple audio cue means you can safely context-switch away from your IDE knowing you'll hear when Claude needs you. No more coming back 10 minutes later to find Claude has been waiting for a permission approval since the moment you left. The sound can be toggled on/off in the settings panel.
+
 ## [1.2.0] - 2026-03-04
 
 ### Improved
