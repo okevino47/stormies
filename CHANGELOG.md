@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1] - 2026-03-05
+
+### Fixed
+
+- **Activity bubbles not appearing** — Activity text was immediately cleared by the turn-end handler (`agentToolsClear`) before the 5-second display timer could expire. Removed premature clearing so the bubble persists naturally.
+- **Bubbles hidden during waiting state** — Thought and activity bubbles were suppressed whenever the character had a waiting or permission canvas bubble active. Removed this filter since the HTML overlay and canvas sprite render at different visual layers and coexist fine.
+
 ## [1.3.0] - 2026-03-05
 
 ### Added

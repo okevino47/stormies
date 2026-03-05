@@ -218,7 +218,6 @@ export function useExtensionMessages(
         os.setAgentTool(id, null)
         os.clearPermissionBubble(id)
         os.clearThinkingText(id)
-        os.clearActivityText(id)
       } else if (msg.type === 'agentSelected') {
         const id = msg.id as number
         setSelectedAgent(id)

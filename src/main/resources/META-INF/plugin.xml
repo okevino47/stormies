@@ -26,6 +26,11 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <b>1.3.1</b>
+        <ul>
+            <li>Fixed activity bubbles not appearing — turn-end handler was clearing text before display timer expired</li>
+            <li>Fixed bubbles hidden during waiting state — HTML overlay and canvas sprite now coexist</li>
+        </ul>
         <b>1.3.0</b>
         <ul>
             <li>Activity pop-up bubbles — every new action triggers a 5-second bubble showing what the agent is doing, no hover needed</li>

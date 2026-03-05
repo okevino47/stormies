@@ -53,9 +53,8 @@ export function ThoughtBubble({ officeState, containerRef, zoom, panRef }: Thoug
   const panelHoveredId = officeState.panelHoveredAgentId
 
   for (const ch of officeState.characters.values()) {
-    // Lower priority than tool overlay (hover/select) and permission/waiting bubbles
+    // Lower priority than tool overlay (hover/select)
     if (ch.id === selectedId || ch.id === hoveredId || ch.id === panelHoveredId) continue
-    if (ch.bubbleType) continue
 
     // Activity text takes priority over thinking text
     const hasActivity = !!ch.activityText
