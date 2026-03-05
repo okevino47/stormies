@@ -1406,6 +1406,21 @@ export function getCharacterSprites(paletteIndex: number, hueShift = 0): Charact
       } as Record<Direction, [SpriteData, SpriteData]>
     }
 
+    // For activity animations missing from PNG sprites, generate from templates
+    const pal = CHARACTER_PALETTES[paletteIndex % CHARACTER_PALETTES.length]
+    const r = (t: TemplateCell[][]) => resolveTemplate(t, pal)
+    const rf = (t: TemplateCell[][]) => resolveTemplate(flipHorizontal(t), pal)
+    const templatePair = (
+      d1: TemplateCell[][], d2: TemplateCell[][],
+      u1: TemplateCell[][], u2: TemplateCell[][],
+      r1: TemplateCell[][], r2: TemplateCell[][],
+    ): Record<Direction, [SpriteData, SpriteData]> => ({
+      [Dir.DOWN]: [r(d1), r(d2)],
+      [Dir.UP]: [r(u1), r(u2)],
+      [Dir.RIGHT]: [r(r1), r(r2)],
+      [Dir.LEFT]: [rf(r1), rf(r2)],
+    } as Record<Direction, [SpriteData, SpriteData]>)
+
     sprites = {
       walk: {
         [Dir.DOWN]: [d[0], d[1], d[2], d[1]],
@@ -1425,14 +1440,14 @@ export function getCharacterSprites(paletteIndex: number, hueShift = 0): Charact
         [Dir.RIGHT]: [rt[5], rt[6]],
         [Dir.LEFT]: [flip(rt[5]), flip(rt[6])],
       },
-      writing: dirPair(d, u, rt, 7),
-      searching: dirPair(d, u, rt, 9),
-      browsing: dirPair(d, u, rt, 11),
-      thinking: dirPair(d, u, rt, 13),
-      phone: dirPair(d, u, rt, 15),
-      presenting: dirPair(d, u, rt, 17),
-      coffee: dirPair(d, u, rt, 19),
-      celebrating: dirPair(d, u, rt, 21),
+      writing: dirPair(d, u, rt, 7) ?? templatePair(AT.DOWN_WRITE_1, AT.DOWN_WRITE_2, AT.UP_WRITE_1, AT.UP_WRITE_2, AT.RIGHT_WRITE_1, AT.RIGHT_WRITE_2),
+      searching: dirPair(d, u, rt, 9) ?? templatePair(AT.DOWN_SEARCH_1, AT.DOWN_SEARCH_2, AT.UP_SEARCH_1, AT.UP_SEARCH_2, AT.RIGHT_SEARCH_1, AT.RIGHT_SEARCH_2),
+      browsing: dirPair(d, u, rt, 11) ?? templatePair(AT.DOWN_BROWSE_1, AT.DOWN_BROWSE_2, AT.UP_BROWSE_1, AT.UP_BROWSE_2, AT.RIGHT_BROWSE_1, AT.RIGHT_BROWSE_2),
+      thinking: dirPair(d, u, rt, 13) ?? templatePair(AT.DOWN_THINK_1, AT.DOWN_THINK_2, AT.UP_THINK_1, AT.UP_THINK_2, AT.RIGHT_THINK_1, AT.RIGHT_THINK_2),
+      phone: dirPair(d, u, rt, 15) ?? templatePair(AT.DOWN_PHONE_1, AT.DOWN_PHONE_2, AT.UP_PHONE_1, AT.UP_PHONE_2, AT.RIGHT_PHONE_1, AT.RIGHT_PHONE_2),
+      presenting: dirPair(d, u, rt, 17) ?? templatePair(AT.DOWN_PRESENT_1, AT.DOWN_PRESENT_2, AT.UP_PRESENT_1, AT.UP_PRESENT_2, AT.RIGHT_PRESENT_1, AT.RIGHT_PRESENT_2),
+      coffee: dirPair(d, u, rt, 19) ?? templatePair(AT.DOWN_COFFEE_1, AT.DOWN_COFFEE_2, AT.UP_COFFEE_1, AT.UP_COFFEE_2, AT.RIGHT_COFFEE_1, AT.RIGHT_COFFEE_2),
+      celebrating: dirPair(d, u, rt, 21) ?? templatePair(AT.DOWN_CELEBRATE_1, AT.DOWN_CELEBRATE_2, AT.UP_CELEBRATE_1, AT.UP_CELEBRATE_2, AT.RIGHT_CELEBRATE_1, AT.RIGHT_CELEBRATE_2),
     }
   } else {
     // Fallback: use hardcoded templates with palette swapping

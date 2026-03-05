@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.2] - 2026-03-05
+
+### Fixed
+
+- **Activity animations not changing between tools** — Characters stayed in the same typing/reading pose regardless of which tool was active. The PNG sprite sheets only contain 7 frames (walk + typing + reading), so all activity-specific animations (writing, searching, browsing, thinking, phone, presenting, coffee, celebrating) returned `undefined` and fell back to typing/reading. Now uses a hybrid approach: PNG sprites for walk/typing/reading, template-generated sprites for the 8 activity animations.
+- **WebSearch mapped to Grep animation** — The `'Searching'` prefix matched before `'Searching web'` in the tool-to-animation lookup, so web searches showed the wrong animation. Fixed by ordering prefixes from longest to shortest.
+
 ## [1.3.1] - 2026-03-05
 
 ### Fixed

@@ -26,6 +26,11 @@
     ]]></description>
 
     <change-notes><![CDATA[
+        <b>1.3.2</b>
+        <ul>
+            <li>Fixed activity animations not changing between tools — hybrid PNG/template sprite approach for all 8 activity types</li>
+            <li>Fixed WebSearch incorrectly mapped to Grep animation</li>
+        </ul>
         <b>1.3.1</b>
         <ul>
             <li>Fixed activity bubbles not appearing — turn-end handler was clearing text before display timer expired</li>
